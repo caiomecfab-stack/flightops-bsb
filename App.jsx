@@ -1,26 +1,8 @@
-// ... existing code ...
 import React, { useState, useMemo } from 'react';
-import {
-  Users,
-  Search,
-  Filter,
-  Calendar,
-  BarChart3,
-  Plane,
-  Briefcase,
-  Trash2,
-  Edit2,
-  AlertCircle,
-  Sun,
-  Moon,
-  Scale,
-  PlusCircle,
-  Check,
-  UserCheck,
-  UserX,
-  UserPlus,
-  Clock,
-  Activity
+import { 
+  Users, Search, Filter, Calendar, BarChart3, Plane, Briefcase,
+  Trash2, Edit2, AlertCircle, Sun, Moon, Scale, PlusCircle,
+  Check, UserCheck, UserX, UserPlus, Clock, Activity
 } from 'lucide-react';
 
 export default function App() {

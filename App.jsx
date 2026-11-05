@@ -10,8 +10,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Lista de Voos Cadastrados Manualmente
-  const [voos, setVoos] = useState([]);
-
+ const [voos, setVoos] = useState([]);
   // Estado para Edição de Voo
   const [editandoId, setEditandoId] = useState(null);
 

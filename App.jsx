@@ -1,5 +1,4 @@
-import React, { useState, useMemo } from 'react';
-import { 
+import React, { useState, useMemo, useEffect } from 'react';
   Users, Search, Filter, Calendar, BarChart3, Plane, Briefcase,
   Trash2, Edit2, AlertCircle, Sun, Moon, Scale, PlusCircle,
   Check, UserCheck, UserX, UserPlus, Clock, Activity
@@ -10,11 +9,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Lista de Voos Cadastrados Manualmente
- const [voos, setVoos] = useState(() => {
+const [voos, setVoos] = useState(() => {
   const salvo = localStorage.getItem('flightops_voos');
   return salvo ? JSON.parse(salvo) : [];
 });
-  // Estado para Edição de Voo
+ useEffect(() => {
+  localStorage.setItem('flightops_voos', JSON.stringify(voos));
+}, [voos]);
   const [editandoId, setEditandoId] = useState(null);
 
   // Frota Oficial da Força Aérea Brasileira (FAB) customizável

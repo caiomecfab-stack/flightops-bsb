@@ -10,7 +10,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Lista de Voos Cadastrados Manualmente
- const [voos, setVoos] = useState([]);
+ const [voos, setVoos] = useState(() => {
+  const salvo = localStorage.getItem('flightops_voos');
+  return salvo ? JSON.parse(salvo) : [];
+});
   // Estado para Edição de Voo
   const [editandoId, setEditandoId] = useState(null);
 

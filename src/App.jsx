@@ -53,14 +53,14 @@ export default function App() {
 
   const [newAircraftInput, setNewAircraftInput] = useState('');
 
-  // Estados dos Filtros Gerais (mesmo cabeçalho do topo)
+  // Estados dos Filtros Gerais (Dashboard)
   const [filterAircraft, setFilterAircraft] = useState('ALL');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterMonthYear, setFilterMonthYear] = useState('');
 
-  // Filtro Específico do Dashboard por Localidade/Destino e Desembarque
+  // Filtros Específicos do Dashboard
   const [dashboardDestinationFilter, setDashboardDestinationFilter] = useState('ALL');
   const [dashboardDebarkFilter, setDashboardDebarkFilter] = useState('ALL');
 
@@ -73,9 +73,13 @@ export default function App() {
   const [reportEndDate, setReportEndDate] = useState('');
   const [reportSpecificDate, setReportSpecificDate] = useState('');
 
-  // Estados da Aba Desembarque Múltiplo
-  const [debarkFilterDate, setDebarkFilterDate] = useState('');
+  // Estados Completos de Filtro da Aba Desembarque (idênticos ao Dashboard)
   const [debarkFilterAircraft, setDebarkFilterAircraft] = useState('ALL');
+  const [debarkStartDate, setDebarkStartDate] = useState('');
+  const [debarkEndDate, setDebarkEndDate] = useState('');
+  const [debarkSpecificDate, setDebarkSpecificDate] = useState('');
+  const [debarkMonthYear, setDebarkMonthYear] = useState('');
+
   const [selectedDebarkFlightIds, setSelectedDebarkFlightIds] = useState([]);
   const [debarkInputs, setDebarkInputs] = useState({});
 
@@ -352,13 +356,16 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchSpecific;
   });
 
+  // Filtros completos para a aba Desembarque
   const debarkTabFilteredFlights = flightList.filter(f => {
-    const matchDate = !debarkFilterDate || f.date === debarkFilterDate;
     const matchAc = debarkFilterAircraft === 'ALL' || f.aircraft === debarkFilterAircraft;
-    return matchDate && matchAc;
+    const matchStart = !debarkStartDate || f.date >= debarkStartDate;
+    const matchEnd = !debarkEndDate || f.date <= debarkEndDate;
+    const matchSpecific = !debarkSpecificDate || f.date === debarkSpecificDate;
+    const matchMonth = !debarkMonthYear || f.date.startsWith(debarkMonthYear);
+    return matchAc && matchStart && matchEnd && matchSpecific && matchMonth;
   });
 
-  // Cálculo Estatístico por Tipo de Aeronave com base nos mesmos filtros do topo
   const statsByAircraft = fabAircrafts.map(ac => {
     const acFlights = filteredFlights.filter(f => f.aircraft === ac);
     const flightsCount = acFlights.length;
@@ -491,7 +498,7 @@ export default function App() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs text-emerald-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span className="font-medium">POSTO CAN BR Operacional</span>
+            <span className="medium">POSTO CAN BR Operacional</span>
           </div>
           <div className="flex items-center space-x-3 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-mono">
             <span className="text-sky-400">{currentUser.name} ({currentUser.role})</span>
@@ -593,7 +600,7 @@ export default function App() {
             </div>
           )}
 
-          {/* BARRA DE FILTROS GERAIS (COMPARTILHADA NO TOPO) */}
+          {/* BARRA DE FILTROS GERAIS COM CALENDÁRIO NATIVO (DASHBOARD E PAINEL) */}
           {(activeTab === 'dashboard' || activeTab === 'panel') && (
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow space-y-4">
               <div className="flex items-center space-x-2 text-sky-400 text-xs font-bold tracking-wider">
@@ -622,7 +629,7 @@ export default function App() {
                     type="date" 
                     value={filterStartDate}
                     onChange={(e) => setFilterStartDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
                   />
                 </div>
 
@@ -632,7 +639,7 @@ export default function App() {
                     type="date" 
                     value={filterEndDate}
                     onChange={(e) => setFilterEndDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
                   />
                 </div>
 
@@ -642,7 +649,7 @@ export default function App() {
                     type="date" 
                     value={filterDate}
                     onChange={(e) => setFilterDate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
                   />
                 </div>
 
@@ -652,12 +659,11 @@ export default function App() {
                     type="month" 
                     value={filterMonthYear}
                     onChange={(e) => setFilterMonthYear(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
                   />
                 </div>
               </div>
 
-              {/* FILTROS ADICIONAIS DO DASHBOARD */}
               {activeTab === 'dashboard' && (
                 <div className="pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col space-y-1">
@@ -695,11 +701,10 @@ export default function App() {
             </div>
           )}
 
-          {/* DASHBOARD COM O NOVO PERFIL DE ESTATÍSTICA */}
+          {/* DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               
-              {/* BLOCO DE ESTATÍSTICA SOLICITADO */}
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center space-x-3">
                   <div className="bg-sky-600 p-2.5 rounded-xl text-white shadow-lg shadow-sky-900/50">
@@ -720,7 +725,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* EXIBIÇÃO EM BLOCOS/QUADRADINHOS SEPARADOS POR TIPO DE AERONAVE */}
               {showStatsReport && (
                 <div className="bg-slate-900 border border-sky-900/50 p-6 rounded-2xl shadow-2xl space-y-6">
                   <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
@@ -760,10 +764,8 @@ export default function App() {
                 </div>
               )}
 
-              {/* GRÁFICOS E CARTÕES GERAIS DO DASHBOARD */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
-                {/* 1. Total de Voos */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">TOTAL DE VOOS</span>
@@ -781,7 +783,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Total de Passageiros (PAX) */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">
@@ -801,7 +802,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 3. Total de Desembarques */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">TOTAL DESEMBARCADOS</span>
@@ -819,7 +819,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 4. Peso Total PAX */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">PESO TOTAL PAX</span>
@@ -837,7 +836,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 5. Peso Total de Bagagem */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">PESO TOTAL DE BAGAGEM</span>
@@ -855,7 +853,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 6. Peso Total Transportado */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 lg:col-span-1 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">PESO TOTAL TRANSP.</span>
@@ -877,40 +874,70 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA DESEMBARQUE MÚLTIPLO */}
+          {/* ABA DESEMBARQUE COM FILTROS COMPLETOS (DATA INICIAL, FINAL, ESPECÍFICA E MÊS/ANO) */}
           {activeTab === 'debark' && (
-            <div className="space-y-6 max-w-4xl mx-auto">
+            <div className="space-y-6 max-w-5xl mx-auto">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
                 <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
                   <UserCheck2 className="w-4 h-4 mr-2 text-sky-400" /> GESTÃO E FILTRO DE DESEMBARQUE — MÚLTIPLOS VOOS
                 </h2>
                 <p className="text-xs text-slate-400 font-sans normal-case">
-                  Filtre por data e aeronave, selecione múltiplos voos e indique o total de passageiros desembarcados de uma só vez.
+                  Filtre por aeronave, data inicial, data final, data específica ou mês/ano, selecione múltiplos voos e indique o total de passageiros desembarcados.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 text-xs">
                   <div>
-                    <label className="block text-slate-400 mb-1">Filtrar por Data</label>
-                    <input 
-                      type="date" 
-                      value={debarkFilterDate}
-                      onChange={(e) => setDebarkFilterDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-sans"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">Filtrar por Aeronave FAB</label>
+                    <label className="block text-slate-400 mb-1">Aeronave FAB</label>
                     <select 
                       value={debarkFilterAircraft}
                       onChange={(e) => setDebarkFilterAircraft(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white uppercase font-sans"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white uppercase font-sans"
                     >
                       <option value="ALL">TODAS AS AERONAVES</option>
                       {fabAircrafts.map((ac, idx) => (
                         <option key={idx} value={ac}>{ac}</option>
                       ))}
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Data Inicial</label>
+                    <input 
+                      type="date" 
+                      value={debarkStartDate}
+                      onChange={(e) => setDebarkStartDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Data Final</label>
+                    <input 
+                      type="date" 
+                      value={debarkEndDate}
+                      onChange={(e) => setDebarkEndDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Data Específica</label>
+                    <input 
+                      type="date" 
+                      value={debarkSpecificDate}
+                      onChange={(e) => setDebarkSpecificDate(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Mês / Ano</label>
+                    <input 
+                      type="month" 
+                      value={debarkMonthYear}
+                      onChange={(e) => setDebarkMonthYear(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
+                    />
                   </div>
                 </div>
               </div>
@@ -937,33 +964,78 @@ export default function App() {
                   <p className="text-xs text-slate-500 text-center py-6 font-sans">Nenhum voo encontrado com os filtros de data/aeronave selecionados.</p>
                 ) : (
                   <form onSubmit={handleSaveBatchDebark} className="space-y-4">
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {debarkTabFilteredFlights.map(f => {
                         const isSelected = selectedDebarkFlightIds.includes(f.id);
+                        const weekdayName = getWeekdayName(f.date);
                         return (
-                          <div key={f.id} className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${isSelected ? 'bg-sky-950/30 border-sky-600/80 shadow-md' : 'bg-slate-950 border-slate-800'}`}>
-                            <div className="flex items-center space-x-3">
-                              <input 
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedDebarkFlightIds([...selectedDebarkFlightIds, f.id]);
-                                  } else {
-                                    setSelectedDebarkFlightIds(selectedDebarkFlightIds.filter(id => id !== f.id));
-                                  }
-                                }}
-                                className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-sky-600 focus:ring-0 cursor-pointer"
-                              />
-                              <div>
-                                <span className="text-xs font-bold text-white block font-mono">{f.aircraft} {f.matricula ? `(${f.matricula})` : ''}</span>
-                                <span className="text-[11px] text-slate-400 font-mono">ROTA: <strong className="text-sky-300">{f.route}</strong> | DATA: {f.date} ({getWeekdayName(f.date)})</span>
-                                <span className="text-[10px] text-emerald-400 block mt-0.5">PAX PREVISTO: {f.paxTotal || f.originalList.length}</span>
+                          <div 
+                            key={f.id} 
+                            onClick={() => {
+                              if (selectedDebarkFlightIds.includes(f.id)) {
+                                setSelectedDebarkFlightIds(selectedDebarkFlightIds.filter(id => id !== f.id));
+                              } else {
+                                setSelectedDebarkFlightIds([...selectedDebarkFlightIds, f.id]);
+                              }
+                            }}
+                            className={`bg-slate-950 border rounded-xl p-5 shadow-lg space-y-4 cursor-pointer transition-all ${isSelected ? 'border-sky-500 bg-sky-950/20 shadow-sky-500/10' : 'border-slate-800 hover:border-slate-700'}`}
+                          >
+                            <div className="flex justify-between items-start border-b border-slate-800 pb-3">
+                              <div className="flex items-center space-x-3">
+                                <input 
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-sky-600 focus:ring-0 cursor-pointer"
+                                />
+                                <div>
+                                  <span className="text-sky-400 font-bold text-sm block">{f.aircraft}</span>
+                                  <span className="text-slate-400 text-xs font-mono">MATRÍCULA: <strong className="text-white">{f.matricula || 'N/D'}</strong></span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="bg-slate-900 px-2.5 py-1 rounded text-xs font-mono text-sky-300 font-bold border border-slate-800">{f.route}</span>
+                                <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
                               </div>
                             </div>
 
-                            <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
-                              <label className="text-[10px] text-slate-400 font-mono">QTD DESEMBARCADOS:</label>
+                            <div className="grid grid-cols-3 gap-2 text-center bg-slate-900 p-3 rounded-lg border border-slate-800 font-mono text-xs">
+                              <div>
+                                <span className="text-[10px] text-slate-500 block">CHAMADA</span>
+                                <span className="text-slate-200">{f.callTime || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-500 block">DECOLAGEM</span>
+                                <span className="text-slate-200">{f.takeoffTime || '-'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-500 block">HORA REAL</span>
+                                <span className="text-slate-200">{f.realTime || '-'}</span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
+                              <div className="bg-slate-900/60 p-2 rounded border border-slate-800">
+                                <span className="text-[10px] text-slate-500 block">PAX PREVISTO</span>
+                                <span className="text-white font-bold">{f.paxTotal || f.originalList.length}</span>
+                              </div>
+                              <div className="bg-slate-900/60 p-2 rounded border border-slate-800">
+                                <span className="text-[10px] text-slate-500 block">PESO TOTAL</span>
+                                <span className="text-sky-400 font-bold">{f.totalWeight} KG</span>
+                              </div>
+                            </div>
+
+                            {weekdayName && (
+                              <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>DIA: <strong className="text-white">{weekdayName}</strong></span>
+                              </div>
+                            )}
+
+                            <div className="pt-2 border-t border-slate-800 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-xs text-cyan-400 font-mono flex items-center">
+                                <UserCheck2 className="w-3.5 h-3.5 mr-1.5" /> QTD DESEMBARCADOS:
+                              </span>
                               <input 
                                 type="number" 
                                 placeholder="0"
@@ -984,7 +1056,7 @@ export default function App() {
 
                     <button 
                       type="submit" 
-                      className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors tracking-wider text-xs shadow-lg"
+                      className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors tracking-wider text-xs shadow-lg mt-4"
                     >
                       GUARDAR DESEMBARQUE PARA OS VOOS SELECIONADOS
                     </button>
@@ -1077,18 +1149,12 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {weekdayName && (
-                          <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>DIA: <strong className="text-white">{weekdayName}</strong></span>
-                          </div>
-                        )}
-                        <div className="flex items-center space-x-2 text-[11px] text-cyan-400 font-mono bg-cyan-950/30 border border-cyan-900/40 px-3 py-1.5 rounded-lg">
-                          <UserCheck2 className="w-3.5 h-3.5" />
-                          <span>DESEMBARCADOS: <strong className="text-white">{f.debarkCount || 0}</strong></span>
+                      {weekdayName && (
+                        <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>DIA: <strong className="text-white">{weekdayName}</strong></span>
                         </div>
-                      </div>
+                      )}
 
                       <div className="flex justify-end items-center pt-2 border-t border-slate-800/50 text-xs space-x-3 font-mono">
                         <button onClick={() => handleEditFlight(f)} className="text-sky-400 hover:text-sky-300 flex items-center space-x-1">
@@ -1143,7 +1209,7 @@ export default function App() {
                       type="date" 
                       value={reportStartDate}
                       onChange={(e) => setReportStartDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
                     />
                   </div>
 
@@ -1153,7 +1219,7 @@ export default function App() {
                       type="date" 
                       value={reportEndDate}
                       onChange={(e) => setReportEndDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
                     />
                   </div>
 
@@ -1163,7 +1229,7 @@ export default function App() {
                       type="date" 
                       value={reportSpecificDate}
                       onChange={(e) => setReportSpecificDate(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-sans cursor-pointer"
                     />
                   </div>
                 </div>
@@ -1412,7 +1478,7 @@ export default function App() {
                       required
                       value={newFlight.date}
                       onChange={(e) => setNewFlight({ ...newFlight, date: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white cursor-pointer"
                     />
                   </div>
 

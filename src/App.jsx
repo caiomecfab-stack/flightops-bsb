@@ -6,7 +6,6 @@ import {
   Filter, 
   Users, 
   Trash2, 
-  FileSpreadsheet, 
   BarChart3, 
   ShieldCheck,
   Menu,
@@ -151,12 +150,19 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchDate && matchMonthYear;
   });
 
-  // Métricas para o Dashboard
+  // Métricas exatas para o Dashboard
   const totalFlightsCount = filteredFlights.length;
   const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.originalList.length || 0), 0);
   const totalPaxWeightAll = filteredFlights.reduce((acc, f) => acc + f.paxWeight, 0);
   const totalBagWeightAll = filteredFlights.reduce((acc, f) => acc + f.bagWeight, 0);
   const totalWeightAll = filteredFlights.reduce((acc, f) => acc + f.totalWeight, 0);
+
+  // Valores máximos de referência para escalar as colunas dos gráficos de barras verticais
+  const maxFlights = Math.max(10, totalFlightsCount * 1.5);
+  const maxPax = Math.max(50, totalPaxAll * 1.5);
+  const maxPaxWeight = Math.max(3000, totalPaxWeightAll * 1.5);
+  const maxBagWeight = Math.max(1000, totalBagWeightAll * 1.5);
+  const maxTotalWeight = Math.max(4000, totalWeightAll * 1.5);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans uppercase">
@@ -315,69 +321,84 @@ export default function App() {
             </div>
           </div>
 
-          {/* DASHBOARD COM GRÁFICO DE BARRAS PARA CADA INFORMAÇÃO */}
+          {/* DASHBOARD COM GRÁFICOS DE BARRAS VERTICAIS PARA CADA INFORMAÇÃO */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
                 {/* 1. Total de Voos */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-sky-500/50 transition-all">
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-4 hover:border-sky-500/50 transition-all flex flex-col justify-between">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
                     <span className="flex items-center"><Plane className="w-4 h-4 mr-2 text-sky-400" /> TOTAL DE VOOS</span>
                     <span className="text-sky-400 font-mono text-lg">{totalFlightsCount}</span>
                   </div>
-                  <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-sky-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-sky-500/50" style={{ width: `${Math.min(100, totalFlightsCount * 15)}%` }}></div>
+                  {/* Gráfico de Barras Verticais */}
+                  <div className="h-32 bg-slate-950 rounded-lg border border-slate-800 flex items-end justify-center p-3">
+                    <div className="w-12 bg-sky-500 rounded-t transition-all duration-500 shadow-lg shadow-sky-500/50 flex items-center justify-center text-[10px] font-bold text-slate-950" style={{ height: `${Math.max(15, (totalFlightsCount / maxFlights) * 100)}%` }}>
+                      {totalFlightsCount}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: VOLUME DE VOOS.</p>
+                  <p className="text-[10px] text-slate-500 text-center">GRÁFICO VERTICAL: VOLUME DE VOOS.</p>
                 </div>
 
                 {/* 2. Total de Passageiros (PAX) */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-emerald-500/50 transition-all">
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-4 hover:border-emerald-500/50 transition-all flex flex-col justify-between">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
                     <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-emerald-400" /> TOTAL DE PASSAGEIROS (PAX)</span>
                     <span className="text-emerald-400 font-mono text-lg">{totalPaxAll}</span>
                   </div>
-                  <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-emerald-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-emerald-500/50" style={{ width: `${Math.min(100, totalPaxAll * 3)}%` }}></div>
+                  {/* Gráfico de Barras Verticais */}
+                  <div className="h-32 bg-slate-950 rounded-lg border border-slate-800 flex items-end justify-center p-3">
+                    <div className="w-12 bg-emerald-500 rounded-t transition-all duration-500 shadow-lg shadow-emerald-500/50 flex items-center justify-center text-[10px] font-bold text-slate-950" style={{ height: `${Math.max(15, (totalPaxAll / maxPax) * 100)}%` }}>
+                      {totalPaxAll}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: FLUXO DE PASSAGEIROS.</p>
+                  <p className="text-[10px] text-slate-500 text-center">GRÁFICO VERTICAL: FLUXO DE PAX.</p>
                 </div>
 
                 {/* 3. Peso Total PAX */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-indigo-500/50 transition-all">
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-4 hover:border-indigo-500/50 transition-all flex flex-col justify-between">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
                     <span className="flex items-center"><Scale className="w-4 h-4 mr-2 text-indigo-400" /> PESO TOTAL PAX</span>
                     <span className="text-indigo-400 font-mono text-lg">{totalPaxWeightAll} KG</span>
                   </div>
-                  <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-indigo-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-indigo-500/50" style={{ width: `${Math.min(100, totalPaxWeightAll / 50)}%` }}></div>
+                  {/* Gráfico de Barras Verticais */}
+                  <div className="h-32 bg-slate-950 rounded-lg border border-slate-800 flex items-end justify-center p-3">
+                    <div className="w-12 bg-indigo-500 rounded-t transition-all duration-500 shadow-lg shadow-indigo-500/50 flex items-center justify-center text-[10px] font-bold text-slate-950" style={{ height: `${Math.max(15, (totalPaxWeightAll / maxPaxWeight) * 100)}%` }}>
+                      {totalPaxWeightAll}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: MASSA DOS PASSAGEIROS.</p>
+                  <p className="text-[10px] text-slate-500 text-center">GRÁFICO VERTICAL: MASSA DE PAX.</p>
                 </div>
 
                 {/* 4. Peso Total de Bagagem */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-amber-500/50 transition-all">
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-4 hover:border-amber-500/50 transition-all flex flex-col justify-between">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
                     <span className="flex items-center"><Briefcase className="w-4 h-4 mr-2 text-amber-400" /> PESO TOTAL DE BAGAGEM</span>
                     <span className="text-amber-400 font-mono text-lg">{totalBagWeightAll} KG</span>
                   </div>
-                  <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-amber-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-amber-500/50" style={{ width: `${Math.min(100, totalBagWeightAll / 30)}%` }}></div>
+                  {/* Gráfico de Barras Verticais */}
+                  <div className="h-32 bg-slate-950 rounded-lg border border-slate-800 flex items-end justify-center p-3">
+                    <div className="w-12 bg-amber-500 rounded-t transition-all duration-500 shadow-lg shadow-amber-500/50 flex items-center justify-center text-[10px] font-bold text-slate-950" style={{ height: `${Math.max(15, (totalBagWeightAll / maxBagWeight) * 100)}%` }}>
+                      {totalBagWeightAll}
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: CARGA DE BAGAGENS.</p>
+                  <p className="text-[10px] text-slate-500 text-center">GRÁFICO VERTICAL: CARGA DE BAGAGEM.</p>
                 </div>
 
                 {/* 5. Peso Total Transportado */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-rose-500/50 transition-all lg:col-span-2">
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-4 hover:border-rose-500/50 transition-all lg:col-span-2 flex flex-col justify-between">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
                     <span className="flex items-center"><Activity className="w-4 h-4 mr-2 text-rose-400" /> PESO TOTAL TRANSPORTADO</span>
                     <span className="text-rose-400 font-mono text-xl">{totalWeightAll} KG</span>
                   </div>
-                  <div className="w-full bg-slate-950 rounded-full h-5 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-gradient-to-r from-rose-600 to-amber-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-rose-500/50" style={{ width: `${Math.min(100, totalWeightAll / 60)}%` }}></div>
+                  {/* Gráfico de Barras Verticais */}
+                  <div className="h-32 bg-slate-950 rounded-lg border border-slate-800 flex items-end justify-center p-3">
+                    <div className="w-16 bg-gradient-to-t from-rose-600 to-amber-500 rounded-t transition-all duration-500 shadow-lg shadow-rose-500/50 flex items-center justify-center text-[10px] font-bold text-white" style={{ height: `${Math.max(15, (totalWeightAll / maxTotalWeight) * 100)}%` }}>
+                      {totalWeightAll} KG
+                    </div>
                   </div>
-                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: SOMA INTEGRAL (PAX + BAGAGEM).</p>
+                  <p className="text-[10px] text-slate-500 text-center">GRÁFICO VERTICAL: SOMA INTEGRAL (PAX + BAGAGEM).</p>
                 </div>
 
               </div>

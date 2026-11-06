@@ -51,6 +51,14 @@ export default function App() {
 
   const [newAircraftInput, setNewAircraftInput] = useState('');
 
+  // Lista de Localidades / Aeródromos Gerenciáveis
+  const [locationsList, setLocationsList] = useState([
+    'SBBR', 'SBGR', 'SBGL', 'SBSP', 'SBFL', 'SBRF', 'SBKP'
+  ]);
+  const [newLocationInput, setNewLocationInput] = useState('');
+  const [editingLocationIndex, setEditingLocationIndex] = useState(null);
+  const [editingLocationValue, setEditingLocationValue] = useState('');
+
   // Estados dos Filtros Gerais
   const [filterAircraft, setFilterAircraft] = useState('ALL');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -146,10 +154,8 @@ export default function App() {
     return `${Math.round(ratio)}%`;
   };
 
-  // Função para calcular o dia da semana por extenso em português
   const getWeekdayName = (dateStr) => {
     if (!dateStr) return '';
-    // Adiciona T12:00:00 para evitar desvios de fuso horário UTC na conversão da data
     const dateObj = new Date(dateStr + 'T12:00:00');
     if (isNaN(dateObj.getTime())) return '';
     const weekdays = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
@@ -165,10 +171,10 @@ export default function App() {
 
   const currentDestinations = getRouteDestinations(newFlight.route);
 
-  // Recolher todas as localidades/destinos únicos já registados no sistema para popular o filtro do dashboard
-  const allAvailableDestinations = Array.from(new Set(
-    flightList.flatMap(f => Object.keys(f.destinationsData || {}))
-  ));
+  const allAvailableDestinations = Array.from(new Set([
+    ...locationsList,
+    ...flightList.flatMap(f => Object.keys(f.destinationsData || {}))
+  ]));
 
   const cleanNameOnly = (line) => {
     let upper = line.trim().toUpperCase();
@@ -216,6 +222,33 @@ export default function App() {
 
   const handleDeleteAircraft = (aircraftToDelete) => {
     setFabAircrafts(fabAircrafts.filter(ac => ac !== aircraftToDelete));
+  };
+
+  // Funções de Gestão de Localidades
+  const handleAddLocation = (e) => {
+    e.preventDefault();
+    if (!newLocationInput.trim()) return;
+    const upperLoc = newLocationInput.trim().toUpperCase();
+    if (!locationsList.includes(upperLoc)) {
+      setLocationsList([...locationsList, upperLoc]);
+      alert('Localidade adicionada com sucesso!');
+    } else {
+      alert('Esta localidade já existe na lista!');
+    }
+    setNewLocationInput('');
+  };
+
+  const handleDeleteLocation = (locToDelete) => {
+    setLocationsList(locationsList.filter(l => l !== locToDelete));
+  };
+
+  const handleSaveEditedLocation = (oldLoc) => {
+    if (!editingLocationValue.trim()) return;
+    const updatedLoc = editingLocationValue.trim().toUpperCase();
+    setLocationsList(locationsList.map(l => l === oldLoc ? updatedLoc : l));
+    setEditingLocationIndex(null);
+    setEditingLocationValue('');
+    alert('Localidade atualizada com sucesso!');
   };
 
   const handleAddFlight = (e) => {
@@ -299,7 +332,6 @@ export default function App() {
     const matchDate = !filterDate || flight.date === filterDate;
     const matchMonthYear = !filterMonthYear || flight.date.startsWith(filterMonthYear);
     
-    // Filtro por Destino no Dashboard
     const matchDestination = dashboardDestinationFilter === 'ALL' || 
       (flight.destinationsData && flight.destinationsData[dashboardDestinationFilter] && Number(flight.destinationsData[dashboardDestinationFilter].pax) > 0);
 
@@ -314,10 +346,7 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchSpecific;
   });
 
-  // Métricas do Dashboard considerando o filtro por localidade
   const totalFlightsCount = filteredFlights.length;
-  
-  // Se houver um filtro de destino ativo, calcula o total de PAX direcionado especificamente para essa localidade
   const totalPaxAll = dashboardDestinationFilter === 'ALL' 
     ? filteredFlights.reduce((acc, f) => acc + (f.paxTotal || f.originalList.length || 0), 0)
     : filteredFlights.reduce((acc, f) => acc + (Number(f.destinationsData[dashboardDestinationFilter]?.pax) || 0), 0);
@@ -486,6 +515,15 @@ export default function App() {
               <span>Adicionar Aeronave</span>
             </button>
 
+            {/* NOVA OPÇÃO NO MENU LATERAL: GERIR LOCALIDADES */}
+            <button 
+              onClick={() => setActiveTab('locations')}
+              className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'locations' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <MapPin className="w-4 h-4" />
+              <span>Gerir Localidades</span>
+            </button>
+
             <button 
               onClick={() => setActiveTab('report')}
               className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'report' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -526,6 +564,7 @@ export default function App() {
               <button onClick={() => setActiveTab('panel')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'panel' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Painel</button>
               <button onClick={() => { setEditingId(null); setActiveTab('new'); }} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'new' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Adicionar</button>
               <button onClick={() => setActiveTab('aircrafts')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'aircrafts' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Aeronaves</button>
+              <button onClick={() => setActiveTab('locations')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'locations' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Localidades</button>
               <button onClick={() => setActiveTab('report')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'report' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Relatório</button>
               <button onClick={() => setActiveTab('users')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'users' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Utilizadores</button>
             </div>
@@ -595,7 +634,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* FILTRO ESPECÍFICO DE LOCALIDADE / DESTINO (APENAS NO DASHBOARD) */}
               {activeTab === 'dashboard' && (
                 <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex items-center space-x-2 text-emerald-400 font-mono text-xs">
@@ -647,7 +685,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Total de Passageiros (PAX) com suporte ao filtro de localidade */}
+                {/* 2. Total de Passageiros (PAX) */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">
@@ -725,7 +763,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS COM O DIA DA SEMANA ABAIXO DA QUANTIDADE DE BAGAGENS */}
+          {/* PAINEL DE VOOS */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -808,7 +846,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Dia da semana exibido exatamente abaixo da quantidade de bagagens */}
                       {weekdayName && (
                         <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
                           <Calendar className="w-3.5 h-3.5" />
@@ -827,6 +864,83 @@ export default function App() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* GERIR LOCALIDADES (NOVA ABA) */}
+          {activeTab === 'locations' && (
+            <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
+              <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
+                <MapPin className="w-4 h-4 mr-2 text-sky-400" /> REGISTAR E GERIR LOCALIDADES / AERÓDROMOS
+              </h2>
+              <form onSubmit={handleAddLocation} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-400 mb-1 font-sans">CÓDIGO ICAO DA LOCALIDADE</label>
+                  <input 
+                    type="text" 
+                    required
+                    placeholder="EX: SBFL"
+                    value={newLocationInput}
+                    onChange={(e) => setNewLocationInput(e.target.value.toUpperCase())}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase font-mono"
+                  />
+                </div>
+                <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-lg transition-colors">
+                  ADICIONAR LOCALIDADE
+                </button>
+              </form>
+
+              <div className="pt-4 border-t border-slate-800">
+                <h3 className="text-xs font-bold text-slate-300 mb-3 tracking-wider">LOCALIDADES REGISTRADAS:</h3>
+                <ul className="space-y-2 font-mono text-xs">
+                  {locationsList.map((loc, idx) => (
+                    <li key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between text-sky-300">
+                      {editingLocationIndex === idx ? (
+                        <div className="flex items-center space-x-2 flex-1 mr-2">
+                          <input 
+                            type="text" 
+                            value={editingLocationValue}
+                            onChange={(e) => setEditingLocationValue(e.target.value.toUpperCase())}
+                            className="bg-slate-900 border border-sky-500 rounded p-1 text-white text-xs w-full uppercase"
+                          />
+                          <button 
+                            onClick={() => handleSaveEditedLocation(loc)}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-[10px]"
+                          >
+                            Salvar
+                          </button>
+                          <button 
+                            onClick={() => setEditingLocationIndex(null)}
+                            className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-[10px]"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="font-bold">{loc}</span>
+                          <div className="flex items-center space-x-3">
+                            <button 
+                              onClick={() => { setEditingLocationIndex(idx); setEditingLocationValue(loc); }}
+                              className="text-sky-400 hover:text-sky-300 flex items-center space-x-1"
+                              title="Editar Localidade"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteLocation(loc)}
+                              className="text-rose-400 hover:text-rose-300"
+                              title="Excluir Localidade"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           )}

@@ -151,7 +151,7 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchDate && matchMonthYear;
   });
 
-  // Métricas exatas para o Dashboard
+  // Métricas para o Dashboard
   const totalFlightsCount = filteredFlights.length;
   const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.originalList.length || 0), 0);
   const totalPaxWeightAll = filteredFlights.reduce((acc, f) => acc + f.paxWeight, 0);
@@ -197,7 +197,7 @@ export default function App() {
               className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'dashboard' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <BarChart3 className="w-4 h-4" />
-              <span>Dashboard Interativo</span>
+              <span>Dashboard</span>
             </button>
 
             <button 
@@ -315,7 +315,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* DASHBOARD PROFISSIONAL E INTERATIVO COM GRÁFICOS DE BARRA */}
+          {/* DASHBOARD COM GRÁFICO DE BARRAS PARA CADA INFORMAÇÃO */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -329,7 +329,7 @@ export default function App() {
                   <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
                     <div className="bg-sky-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-sky-500/50" style={{ width: `${Math.min(100, totalFlightsCount * 15)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">MÉTRICA DE MOVIMENTO DE AERONAVES.</p>
+                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: VOLUME DE VOOS.</p>
                 </div>
 
                 {/* 2. Total de Passageiros (PAX) */}
@@ -341,7 +341,7 @@ export default function App() {
                   <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
                     <div className="bg-emerald-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-emerald-500/50" style={{ width: `${Math.min(100, totalPaxAll * 3)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">EFETIVO TOTAL PREVISTO E TRANSPORTADO.</p>
+                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: FLUXO DE PASSAGEIROS.</p>
                 </div>
 
                 {/* 3. Peso Total PAX */}
@@ -353,7 +353,7 @@ export default function App() {
                   <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
                     <div className="bg-indigo-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-indigo-500/50" style={{ width: `${Math.min(100, totalPaxWeightAll / 50)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">MASSA COMBINADA DOS PASSAGEIROS.</p>
+                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: MASSA DOS PASSAGEIROS.</p>
                 </div>
 
                 {/* 4. Peso Total de Bagagem */}
@@ -365,7 +365,7 @@ export default function App() {
                   <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
                     <div className="bg-amber-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-amber-500/50" style={{ width: `${Math.min(100, totalBagWeightAll / 30)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">CARGA DE BAGAGEM REGISTRADA.</p>
+                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: CARGA DE BAGAGENS.</p>
                 </div>
 
                 {/* 5. Peso Total Transportado */}
@@ -377,7 +377,7 @@ export default function App() {
                   <div className="w-full bg-slate-950 rounded-full h-5 overflow-hidden p-0.5 border border-slate-800">
                     <div className="bg-gradient-to-r from-rose-600 to-amber-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-rose-500/50" style={{ width: `${Math.min(100, totalWeightAll / 60)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">SOMA INTEGRAL DE PESO (PAX + BAGAGEM) NO POSTO PR.</p>
+                  <p className="text-[10px] text-slate-500">GRÁFICO DE BARRAS: SOMA INTEGRAL (PAX + BAGAGEM).</p>
                 </div>
 
               </div>

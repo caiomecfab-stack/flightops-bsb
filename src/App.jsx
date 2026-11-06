@@ -13,7 +13,8 @@ import {
   Database,
   Scale,
   Briefcase,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Edit3
 } from 'lucide-react';
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
       callTime: '1330',
       takeoffTime: '1400',
       realTime: '1420',
+      paxTotal: 3,
       paxWeight: 960,
       bagWeight: 240,
       totalWeight: 1200,
@@ -58,6 +60,8 @@ export default function App() {
     }
   ]);
 
+  // Estado para Criar/Editar Voo
+  const [editingId, setEditingId] = useState(null);
   const [newFlight, setNewFlight] = useState({
     aircraft: fabAircrafts[0],
     matricula: '',
@@ -66,6 +70,7 @@ export default function App() {
     callTime: '',
     takeoffTime: '',
     realTime: '',
+    paxTotal: '',
     paxWeight: '',
     bagWeight: '',
     bagCount: '',
@@ -84,7 +89,7 @@ export default function App() {
 
   const formOriginalList = newFlight.originalText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
   const formEmbarkedList = newFlight.embarkedText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
-  const formTotalPrev = formOriginalList.length;
+  const formTotalPrev = Number(newFlight.paxTotal) || formOriginalList.length;
   const formTotalEmb = formEmbarkedList.length;
   const formFaltas = Math.max(0, formTotalPrev - formTotalEmb);
   const formExtras = Math.max(0, formTotalEmb - formTotalPrev);
@@ -101,10 +106,15 @@ export default function App() {
     alert('Nova aeronave adicionada com sucesso!');
   };
 
+  const handleDeleteAircraft = (aircraftToDelete) => {
+    setFabAircrafts(fabAircrafts.filter(ac => ac !== aircraftToDelete));
+  };
+
   const handleAddFlight = (e) => {
     e.preventDefault();
-    const flightToAdd = {
-      id: `FL-00${flightList.length + 1}`,
+    
+    const flightData = {
+      id: editingId ? editingId : `FL-00${flightList.length + 1}`,
       aircraft: newFlight.aircraft,
       matricula: newFlight.matricula.toUpperCase(),
       route: newFlight.route.toUpperCase(),
@@ -112,6 +122,7 @@ export default function App() {
       callTime: newFlight.callTime,
       takeoffTime: newFlight.takeoffTime,
       realTime: newFlight.realTime,
+      paxTotal: Number(newFlight.paxTotal) || formOriginalList.length || 0,
       paxWeight: Number(newFlight.paxWeight) || 0,
       bagWeight: Number(newFlight.bagWeight) || 0,
       totalWeight: (Number(newFlight.paxWeight) || 0) + (Number(newFlight.bagWeight) || 0),
@@ -120,7 +131,14 @@ export default function App() {
       embarkedList: formEmbarkedList
     };
 
-    setFlightList([flightToAdd, ...flightList]);
+    if (editingId) {
+      setFlightList(flightList.map(f => f.id === editingId ? flightData : f));
+      setEditingId(null);
+      alert('Voo atualizado com sucesso!');
+    } else {
+      setFlightList([flightData, ...flightList]);
+    }
+
     setNewFlight({
       aircraft: fabAircrafts[0],
       matricula: '',
@@ -129,6 +147,7 @@ export default function App() {
       callTime: '',
       takeoffTime: '',
       realTime: '',
+      paxTotal: '',
       paxWeight: '',
       bagWeight: '',
       bagCount: '',
@@ -136,6 +155,26 @@ export default function App() {
       embarkedText: ''
     });
     setActiveTab('panel');
+  };
+
+  const handleEditFlight = (flight) => {
+    setEditingId(flight.id);
+    setNewFlight({
+      aircraft: flight.aircraft,
+      matricula: flight.matricula,
+      route: flight.route,
+      date: flight.date,
+      callTime: flight.callTime,
+      takeoffTime: flight.takeoffTime,
+      realTime: flight.realTime,
+      paxTotal: flight.paxTotal || flight.originalList.length,
+      paxWeight: flight.paxWeight,
+      bagWeight: flight.bagWeight,
+      bagCount: flight.bagCount,
+      originalText: flight.originalList.join('\n'),
+      embarkedText: flight.embarkedList.join('\n')
+    });
+    setActiveTab('new');
   };
 
   const handleDeleteFlight = (id) => {
@@ -153,7 +192,7 @@ export default function App() {
 
   // Métricas do Dashboard
   const totalFlightsCount = filteredFlights.length;
-  const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.originalList.length || 0), 0);
+  const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.paxTotal || f.originalList.length || 0), 0);
   const totalPaxWeightAll = filteredFlights.reduce((acc, f) => acc + f.paxWeight, 0);
   const totalBagWeightAll = filteredFlights.reduce((acc, f) => acc + f.bagWeight, 0);
   const totalWeightAll = filteredFlights.reduce((acc, f) => acc + f.totalWeight, 0);
@@ -215,7 +254,7 @@ export default function App() {
             </button>
             
             <button 
-              onClick={() => setActiveTab('new')}
+              onClick={() => { setEditingId(null); setActiveTab('new'); }}
               className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'new' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <PlusCircle className="w-4 h-4" />
@@ -252,7 +291,7 @@ export default function App() {
               </button>
               <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'dashboard' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Dashboard</button>
               <button onClick={() => setActiveTab('panel')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'panel' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Painel</button>
-              <button onClick={() => setActiveTab('new')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'new' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Adicionar Voo</button>
+              <button onClick={() => { setEditingId(null); setActiveTab('new'); }} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'new' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Adicionar Voo</button>
               <button onClick={() => setActiveTab('aircrafts')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'aircrafts' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Aeronaves</button>
             </div>
           )}
@@ -395,7 +434,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS EM FORMATO DE CAIXAS RETANGULARES */}
+          {/* PAINEL DE VOOS EM FORMATO DE CAIXAS COM OPÇÃO DE EDITAR E APAGAR */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -435,7 +474,7 @@ export default function App() {
                     <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
                       <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
                         <span className="text-[10px] text-slate-500 block">PAX</span>
-                        <span className="text-white font-bold">{f.originalList.length}</span>
+                        <span className="text-white font-bold">{f.paxTotal || f.originalList.length}</span>
                       </div>
                       <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
                         <span className="text-[10px] text-slate-500 block">PESO PAX</span>
@@ -453,9 +492,14 @@ export default function App() {
 
                     <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
                       <span className="text-slate-400 font-mono">QTD BAGAGENS: <strong className="text-white">{f.bagCount}</strong></span>
-                      <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300 flex items-center space-x-1 font-mono">
-                        <Trash2 className="w-4 h-4 inline" /> <span>APAGAR</span>
-                      </button>
+                      <div className="flex items-center space-x-3 font-mono">
+                        <button onClick={() => handleEditFlight(f)} className="text-sky-400 hover:text-sky-300 flex items-center space-x-1">
+                          <Edit3 className="w-4 h-4 inline" /> <span>EDITAR</span>
+                        </button>
+                        <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300 flex items-center space-x-1">
+                          <Trash2 className="w-4 h-4 inline" /> <span>APAGAR</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -463,11 +507,11 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR AERONAVE */}
+          {/* ADICIONAR AERONAVE COM OPÇÃO DE EXCLUIR */}
           {activeTab === 'aircrafts' && (
             <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
-                <Plane className="w-4 h-4 mr-2 text-sky-400" /> REGISTAR NOVA AERONAVE FAB
+                <Plane className="w-4 h-4 mr-2 text-sky-400" /> REGISTAR E GERIR AERONAVES FAB
               </h2>
               <form onSubmit={handleAddAircraft} className="space-y-4 text-xs">
                 <div>
@@ -492,7 +536,16 @@ export default function App() {
                   {fabAircrafts.map((ac, idx) => (
                     <li key={idx} className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between text-sky-300">
                       <span>{ac}</span>
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <div className="flex items-center space-x-3">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <button 
+                          onClick={() => handleDeleteAircraft(ac)}
+                          className="text-rose-400 hover:text-rose-300"
+                          title="Excluir Aeronave"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -500,11 +553,11 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR VOO (COM TODOS OS ITENS RESTAURADOS) */}
+          {/* ADICIONAR / EDITAR VOO (COM CAMPO TOTAL DE PAX INCLUÍDO) */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
-                <PlusCircle className="w-4 h-4 mr-2 text-sky-400" /> ADICIONAR VOO — POSTO PR
+                <PlusCircle className="w-4 h-4 mr-2 text-sky-400" /> {editingId ? 'EDITAR VOO' : 'ADICIONAR VOO'} — POSTO PR
               </h2>
               
               <form onSubmit={handleAddFlight} className="space-y-6 text-xs font-sans">
@@ -586,6 +639,19 @@ export default function App() {
                       value={newFlight.realTime}
                       onChange={(e) => setNewFlight({ ...newFlight, realTime: formatTimeInput(e.target.value) })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
+                    />
+                  </div>
+
+                  {/* CAMPO TOTAL DE PASSAGEIROS ADICIONADO */}
+                  <div>
+                    <label className="block text-slate-400 mb-1">TOTAL DE PASSAGEIROS (PAX)</label>
+                    <input 
+                      type="number" 
+                      required
+                      placeholder="0"
+                      value={newFlight.paxTotal}
+                      onChange={(e) => setNewFlight({ ...newFlight, paxTotal: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono font-bold text-sky-400"
                     />
                   </div>
 
@@ -687,7 +753,7 @@ export default function App() {
                 </div>
 
                 <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors mt-4 tracking-wider">
-                  SALVAR VOO E GERAR RELATÓRIO DO POSTO PR
+                  {editingId ? 'ATUALIZAR VOO NO POSTO PR' : 'SALVAR VOO E GERAR RELATÓRIO DO POSTO PR'}
                 </button>
               </form>
             </div>

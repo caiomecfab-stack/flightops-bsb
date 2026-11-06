@@ -25,16 +25,18 @@ import {
   MapPin,
   Calendar,
   UserCheck2,
-  PieChart
+  PieChart,
+  User
 } from 'lucide-react';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState({ name: 'ADMINISTRADOR', role: 'ADMIN' });
+  // Utilizador padrão inicial CAIO - ADMINISTRADOR
+  const [currentUser, setCurrentUser] = useState({ name: 'CAIO', role: 'ADMIN' });
   const [authView, setAuthView] = useState('login');
   const [loginInput, setLoginInput] = useState({ user: '', pass: '' });
   
   const [usersList, setUsersList] = useState([
-    { name: 'ADMINISTRADOR', pass: 'admin123', role: 'ADMIN' }
+    { name: 'CAIO', pass: 'admin123', role: 'ADMIN' }
   ]);
   const [newUserForm, setNewUserForm] = useState({ name: '', pass: '', role: 'OPERADOR' });
   const [adminNewPass, setAdminNewPass] = useState('');
@@ -73,7 +75,7 @@ export default function App() {
   const [reportEndDate, setReportEndDate] = useState('');
   const [reportSpecificDate, setReportSpecificDate] = useState('');
 
-  // Estados Completos de Filtro da Aba Desembarque (idênticos ao Dashboard)
+  // Filtros da Aba Desembarque
   const [debarkFilterAircraft, setDebarkFilterAircraft] = useState('ALL');
   const [debarkStartDate, setDebarkStartDate] = useState('');
   const [debarkEndDate, setDebarkEndDate] = useState('');
@@ -83,7 +85,7 @@ export default function App() {
   const [selectedDebarkFlightIds, setSelectedDebarkFlightIds] = useState([]);
   const [debarkInputs, setDebarkInputs] = useState({});
 
-  // Estado dos Voos
+  // Estado dos Voos com auditoria de última alteração (quem e quando)
   const [flightList, setFlightList] = useState([
     { 
       id: 'FL-001', 
@@ -105,7 +107,9 @@ export default function App() {
       },
       debarkCount: 3,
       originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
-      embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA']
+      embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA'],
+      lastModifiedBy: 'CAIO',
+      lastModifiedAt: '06/06/2026 às 10:30'
     }
   ]);
 
@@ -218,6 +222,13 @@ export default function App() {
   const formExtras = extraNamesCount;
   const formPercFaltas = formOriginalList.length > 0 ? ((formFaltas / formOriginalList.length) * 100).toFixed(1) : '0.0';
 
+  const getFormattedNow = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('pt-BR');
+    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr} às ${timeStr}`;
+  };
+
   const handleAddAircraft = (e) => {
     e.preventDefault();
     if (!newAircraftInput.trim()) return;
@@ -236,6 +247,9 @@ export default function App() {
   const handleAddFlight = (e) => {
     e.preventDefault();
     
+    const modifierName = currentUser ? currentUser.name : 'CAIO';
+    const modificationTime = getFormattedNow();
+
     const flightData = {
       id: editingId ? editingId : `FL-00${flightList.length + 1}`,
       aircraft: newFlight.aircraft,
@@ -253,7 +267,9 @@ export default function App() {
       destinationsData: newFlight.destinationsData || {},
       debarkCount: Number(newFlight.debarkCount) || 0,
       originalList: formOriginalList,
-      embarkedList: formEmbarkedList
+      embarkedList: formEmbarkedList,
+      lastModifiedBy: modifierName,
+      lastModifiedAt: modificationTime
     };
 
     if (editingId) {
@@ -317,12 +333,17 @@ export default function App() {
       return;
     }
 
+    const modifierName = currentUser ? currentUser.name : 'CAIO';
+    const modificationTime = getFormattedNow();
+
     setFlightList(flightList.map(f => {
       if (selectedDebarkFlightIds.includes(f.id)) {
         const inputVal = debarkInputs[f.id];
         return {
           ...f,
-          debarkCount: inputVal !== undefined ? Number(inputVal) || 0 : (f.debarkCount || 0)
+          debarkCount: inputVal !== undefined ? Number(inputVal) || 0 : (f.debarkCount || 0),
+          lastModifiedBy: modifierName,
+          lastModifiedAt: modificationTime
         };
       }
       return f;
@@ -356,7 +377,6 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchSpecific;
   });
 
-  // Filtros completos para a aba Desembarque
   const debarkTabFilteredFlights = flightList.filter(f => {
     const matchAc = debarkFilterAircraft === 'ALL' || f.aircraft === debarkFilterAircraft;
     const matchStart = !debarkStartDate || f.date >= debarkStartDate;
@@ -412,16 +432,16 @@ export default function App() {
       setCurrentUser(found);
       setLoginInput({ user: '', pass: '' });
     } else {
-      alert('Utilizador ou senha incorretos! (Nota: A senha padrão inicial do Administrador é admin123)');
+      alert('Utilizador ou senha incorretos! (Nota: O utilizador inicial padrão é CAIO, senha admin123)');
     }
   };
 
   const handleChangeAdminPassword = (e) => {
     e.preventDefault();
     if (!adminNewPass) return;
-    setUsersList(usersList.map(u => u.name === 'ADMINISTRADOR' ? { ...u, pass: adminNewPass } : u));
+    setUsersList(usersList.map(u => u.name === 'CAIO' ? { ...u, pass: adminNewPass } : u));
     setAdminNewPass('');
-    alert('Senha do Administrador alterada com sucesso!');
+    alert('Senha do Administrador CAIO alterada com sucesso!');
   };
 
   if (!currentUser) {
@@ -437,7 +457,7 @@ export default function App() {
           </div>
 
           <div className="bg-slate-950 p-3 rounded-xl border border-sky-900/40 text-[11px] text-sky-300 font-mono">
-            ℹ️ <strong>Credencial padrão inicial:</strong> Utilizador: <strong>ADMINISTRADOR</strong> | Senha: <strong>admin123</strong>
+            ℹ️ <strong>Credencial padrão inicial:</strong> Utilizador: <strong>CAIO</strong> | Senha: <strong>admin123</strong>
           </div>
 
           {authView === 'login' ? (
@@ -447,7 +467,7 @@ export default function App() {
                 <input 
                   type="text" 
                   required
-                  placeholder="EX: ADMINISTRADOR"
+                  placeholder="EX: CAIO"
                   value={loginInput.user}
                   onChange={(e) => setLoginInput({ ...loginInput, user: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase font-mono"
@@ -498,7 +518,7 @@ export default function App() {
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs text-emerald-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span className="medium">POSTO CAN BR Operacional</span>
+            <span className="font-medium">POSTO CAN BR Operacional</span>
           </div>
           <div className="flex items-center space-x-3 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs font-mono">
             <span className="text-sky-400">{currentUser.name} ({currentUser.role})</span>
@@ -511,7 +531,6 @@ export default function App() {
 
       {/* Main Container */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar com a Ordem Exata Solicitada */}
         {sidebarOpen && (
           <aside className="w-64 bg-slate-900/90 border-r border-slate-800 p-4 flex flex-col space-y-2 transition-all duration-300">
             <button 
@@ -582,7 +601,6 @@ export default function App() {
           </aside>
         )}
 
-        {/* Content Area */}
         <main className="flex-1 p-6 overflow-y-auto bg-slate-950 space-y-6">
           
           {!sidebarOpen && (
@@ -600,7 +618,7 @@ export default function App() {
             </div>
           )}
 
-          {/* BARRA DE FILTROS GERAIS COM CALENDÁRIO NATIVO (DASHBOARD E PAINEL) */}
+          {/* BARRA DE FILTROS GERAIS (DASHBOARD E PAINEL) COM CALENDÁRIO INTERATIVO */}
           {(activeTab === 'dashboard' || activeTab === 'panel') && (
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow space-y-4">
               <div className="flex items-center space-x-2 text-sky-400 text-xs font-bold tracking-wider">
@@ -874,7 +892,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA DESEMBARQUE COM FILTROS COMPLETOS (DATA INICIAL, FINAL, ESPECÍFICA E MÊS/ANO) */}
+          {/* ABA DESEMBARQUE SIMPLIFICADA (APENAS AERONAVE, DATA, DIA E QTD DESEMBARCADOS) */}
           {activeTab === 'debark' && (
             <div className="space-y-6 max-w-5xl mx-auto">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
@@ -989,52 +1007,21 @@ export default function App() {
                                   className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-sky-600 focus:ring-0 cursor-pointer"
                                 />
                                 <div>
-                                  <span className="text-sky-400 font-bold text-sm block">{f.aircraft}</span>
-                                  <span className="text-slate-400 text-xs font-mono">MATRÍCULA: <strong className="text-white">{f.matricula || 'N/D'}</strong></span>
+                                  <span className="text-sky-400 font-bold text-base block">{f.aircraft}</span>
+                                  <span className="text-slate-400 text-xs font-mono">DATA: <strong className="text-white">{f.date}</strong></span>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <span className="bg-slate-900 px-2.5 py-1 rounded text-xs font-mono text-sky-300 font-bold border border-slate-800">{f.route}</span>
-                                <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
+                                <span className="bg-sky-950/60 px-3 py-1 rounded text-xs font-mono text-sky-300 font-bold border border-sky-900/50 block">
+                                  {weekdayName || 'DIA'}
+                                </span>
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 text-center bg-slate-900 p-3 rounded-lg border border-slate-800 font-mono text-xs">
-                              <div>
-                                <span className="text-[10px] text-slate-500 block">CHAMADA</span>
-                                <span className="text-slate-200">{f.callTime || '-'}</span>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-slate-500 block">DECOLAGEM</span>
-                                <span className="text-slate-200">{f.takeoffTime || '-'}</span>
-                              </div>
-                              <div>
-                                <span className="text-[10px] text-slate-500 block">HORA REAL</span>
-                                <span className="text-slate-200">{f.realTime || '-'}</span>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
-                              <div className="bg-slate-900/60 p-2 rounded border border-slate-800">
-                                <span className="text-[10px] text-slate-500 block">PAX PREVISTO</span>
-                                <span className="text-white font-bold">{f.paxTotal || f.originalList.length}</span>
-                              </div>
-                              <div className="bg-slate-900/60 p-2 rounded border border-slate-800">
-                                <span className="text-[10px] text-slate-500 block">PESO TOTAL</span>
-                                <span className="text-sky-400 font-bold">{f.totalWeight} KG</span>
-                              </div>
-                            </div>
-
-                            {weekdayName && (
-                              <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
-                                <Calendar className="w-3.5 h-3.5" />
-                                <span>DIA: <strong className="text-white">{weekdayName}</strong></span>
-                              </div>
-                            )}
-
-                            <div className="pt-2 border-t border-slate-800 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
-                              <span className="text-xs text-cyan-400 font-mono flex items-center">
-                                <UserCheck2 className="w-3.5 h-3.5 mr-1.5" /> QTD DESEMBARCADOS:
+                            {/* Campo de input de desembarque dentro do cartão */}
+                            <div className="pt-2 flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-800" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-xs text-cyan-400 font-mono flex items-center font-bold">
+                                <UserCheck2 className="w-4 h-4 mr-2" /> QTD DESEMBARCADOS:
                               </span>
                               <input 
                                 type="number" 
@@ -1046,7 +1033,7 @@ export default function App() {
                                     setSelectedDebarkFlightIds([...selectedDebarkFlightIds, f.id]);
                                   }
                                 }}
-                                className="w-24 bg-slate-900 border border-slate-700 rounded p-2 text-white font-mono text-xs font-bold text-cyan-400 text-center"
+                                className="w-28 bg-slate-950 border border-slate-700 rounded p-2 text-white font-mono text-sm font-bold text-cyan-400 text-center"
                               />
                             </div>
                           </div>
@@ -1066,7 +1053,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS */}
+          {/* PAINEL DE VOOS COM AUDITORIA DE ALTERAÇÃO (QUEM E QUANDO) */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -1079,90 +1066,100 @@ export default function App() {
                   const effectiveness = calculateEffectiveness(f);
                   const weekdayName = getWeekdayName(f.date);
                   return (
-                    <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4 relative hover:border-sky-500/50 transition-all">
-                      <div className="flex justify-between items-start border-b border-slate-800 pb-3">
-                        <div>
-                          <span className="text-sky-400 font-bold text-sm block">{f.aircraft}</span>
-                          <span className="text-slate-400 text-xs font-mono">MATRÍCULA: <strong className="text-white">{f.matricula || 'N/D'}</strong></span>
-                        </div>
-                        <div className="text-right">
-                          <span className="bg-slate-800 px-2.5 py-1 rounded text-xs font-mono text-sky-300 font-bold">{f.route}</span>
-                          <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
-                        </div>
-                      </div>
-
-                      {f.destinationsData && Object.keys(f.destinationsData).length > 0 && (
-                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
-                          <span className="text-[10px] text-sky-400 font-bold tracking-wider flex items-center">
-                            <MapPin className="w-3 h-3 mr-1" /> QUANTIDADE DE PASSAGEIROS POR DESTINO:
-                          </span>
-                          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                            {Object.entries(f.destinationsData).map(([dest, info], idx) => (
-                              <div key={idx} className="bg-slate-900 p-2 rounded border border-slate-800">
-                                <span className="text-slate-400 text-[10px] block">DESTINO: {dest}</span>
-                                <span className="text-emerald-400 font-bold">{info.pax || 0} PAX</span>
-                              </div>
-                            ))}
+                    <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4 relative hover:border-sky-500/50 transition-all flex flex-col justify-between">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-start border-b border-slate-800 pb-3">
+                          <div>
+                            <span className="text-sky-400 font-bold text-sm block">{f.aircraft}</span>
+                            <span className="text-slate-400 text-xs font-mono">MATRÍCULA: <strong className="text-white">{f.matricula || 'N/D'}</strong></span>
+                          </div>
+                          <div className="text-right">
+                            <span className="bg-slate-800 px-2.5 py-1 rounded text-xs font-mono text-sky-300 font-bold">{f.route}</span>
+                            <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
                           </div>
                         </div>
-                      )}
 
-                      <div className="grid grid-cols-3 gap-2 text-center bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs">
-                        <div>
-                          <span className="text-[10px] text-slate-500 block">CHAMADA</span>
-                          <span className="text-slate-200">{f.callTime || '-'}</span>
+                        {f.destinationsData && Object.keys(f.destinationsData).length > 0 && (
+                          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
+                            <span className="text-[10px] text-sky-400 font-bold tracking-wider flex items-center">
+                              <MapPin className="w-3 h-3 mr-1" /> QUANTIDADE DE PASSAGEIROS POR DESTINO:
+                            </span>
+                            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                              {Object.entries(f.destinationsData).map(([dest, info], idx) => (
+                                <div key={idx} className="bg-slate-900 p-2 rounded border border-slate-800">
+                                  <span className="text-slate-400 text-[10px] block">DESTINO: {dest}</span>
+                                  <span className="text-emerald-400 font-bold">{info.pax || 0} PAX</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-3 gap-2 text-center bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs">
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">CHAMADA</span>
+                            <span className="text-slate-200">{f.callTime || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">DECOLAGEM</span>
+                            <span className="text-slate-200">{f.takeoffTime || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-500 block">HORA REAL</span>
+                            <span className="text-slate-200">{f.realTime || '-'}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[10px] text-slate-500 block">DECOLAGEM</span>
-                          <span className="text-slate-200">{f.takeoffTime || '-'}</span>
+
+                        <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
+                          <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                            <span className="text-[10px] text-slate-500 block">PAX</span>
+                            <span className="text-white font-bold">{f.paxTotal || f.originalList.length}</span>
+                          </div>
+                          <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                            <span className="text-[10px] text-slate-500 block">PESO PAX</span>
+                            <span className="text-slate-300">{f.paxWeight} KG</span>
+                          </div>
+                          <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                            <span className="text-[10px] text-slate-500 block">BAGAGEM</span>
+                            <span className="text-slate-300">{f.bagWeight} KG</span>
+                          </div>
+                          <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                            <span className="text-[10px] text-slate-500 block">TOTAL</span>
+                            <span className="text-sky-400 font-bold">{f.totalWeight} KG</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[10px] text-slate-500 block">HORA REAL</span>
-                          <span className="text-slate-200">{f.realTime || '-'}</span>
+
+                        <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
+                          <span className="text-slate-400 font-mono">QTD BAGAGENS: <strong className="text-white">{f.bagCount}</strong></span>
+                          <div className="flex items-center space-x-2 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1 rounded-lg">
+                            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-slate-300 font-mono text-[11px]">EFETIVIDADE: <strong className="text-emerald-400">{effectiveness}</strong></span>
+                          </div>
                         </div>
+
+                        {weekdayName && (
+                          <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>DIA: <strong className="text-white">{weekdayName}</strong></span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
-                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                          <span className="text-[10px] text-slate-500 block">PAX</span>
-                          <span className="text-white font-bold">{f.paxTotal || f.originalList.length}</span>
+                      {/* RODAPÉ DO CARTÃO: ÚLTIMA ALTERAÇÃO POR UTILIZADOR E HORÁRIO */}
+                      <div className="pt-3 mt-3 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center text-[11px] font-mono text-slate-400 gap-2">
+                        <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-sky-300">
+                          <User className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Última alt. por: <strong className="text-white">{f.lastModifiedBy || 'CAIO'}</strong> ({f.lastModifiedAt || 'N/D'})</span>
                         </div>
-                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                          <span className="text-[10px] text-slate-500 block">PESO PAX</span>
-                          <span className="text-slate-300">{f.paxWeight} KG</span>
-                        </div>
-                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                          <span className="text-[10px] text-slate-500 block">BAGAGEM</span>
-                          <span className="text-slate-300">{f.bagWeight} KG</span>
-                        </div>
-                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                          <span className="text-[10px] text-slate-500 block">TOTAL</span>
-                          <span className="text-sky-400 font-bold">{f.totalWeight} KG</span>
-                        </div>
-                      </div>
 
-                      <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
-                        <span className="text-slate-400 font-mono">QTD BAGAGENS: <strong className="text-white">{f.bagCount}</strong></span>
-                        <div className="flex items-center space-x-2 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1 rounded-lg">
-                          <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                          <span className="text-slate-300 font-mono text-[11px]">EFETIVIDADE: <strong className="text-emerald-400">{effectiveness}</strong></span>
+                        <div className="flex items-center space-x-3">
+                          <button onClick={() => handleEditFlight(f)} className="text-sky-400 hover:text-sky-300 flex items-center space-x-1">
+                            <Edit3 className="w-4 h-4 inline" /> <span>EDITAR</span>
+                          </button>
+                          <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300 flex items-center space-x-1">
+                            <Trash2 className="w-4 h-4 inline" /> <span>APAGAR</span>
+                          </button>
                         </div>
-                      </div>
-
-                      {weekdayName && (
-                        <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
-                          <Calendar className="w-3.5 h-3.5" />
-                          <span>DIA: <strong className="text-white">{weekdayName}</strong></span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-end items-center pt-2 border-t border-slate-800/50 text-xs space-x-3 font-mono">
-                        <button onClick={() => handleEditFlight(f)} className="text-sky-400 hover:text-sky-300 flex items-center space-x-1">
-                          <Edit3 className="w-4 h-4 inline" /> <span>EDITAR</span>
-                        </button>
-                        <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300 flex items-center space-x-1">
-                          <Trash2 className="w-4 h-4 inline" /> <span>APAGAR</span>
-                        </button>
                       </div>
                     </div>
                   );
@@ -1304,14 +1301,14 @@ export default function App() {
             <div className="max-w-xl mx-auto space-y-6">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
                 <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
-                  <Key className="w-4 h-4 mr-2 text-sky-400" /> SEGURANÇA E SENHA DO ADMINISTRADOR
+                  <Key className="w-4 h-4 mr-2 text-sky-400" /> SEGURANÇA E SENHA DO ADMINISTRADOR CAIO
                 </h2>
                 <form onSubmit={handleChangeAdminPassword} className="space-y-4 text-xs">
                   <p className="text-slate-400 text-[11px] font-sans normal-case">
-                    A senha padrão inicial do Administrador é <strong className="text-white">admin123</strong>. Utilize o formulário abaixo para definir a sua senha personalizada de Administrador.
+                    A senha padrão inicial do Administrador <strong className="text-white">CAIO</strong> é <strong className="text-white">admin123</strong>. Utilize o formulário abaixo para definir a sua senha personalizada.
                   </p>
                   <div>
-                    <label className="block text-slate-400 mb-1">NOVA SENHA PARA O ADMINISTRADOR</label>
+                    <label className="block text-slate-400 mb-1">NOVA SENHA PARA O ADMINISTRADOR CAIO</label>
                     <input 
                       type="password" 
                       required
@@ -1357,7 +1354,7 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label className="block text-slate-400 mb-1">PERFIL</label>
+                      <label className="block text-slate-400 mb-1">PERFIL (OPERADOR OU ADMINISTRADOR)</label>
                       <select 
                         value={newUserForm.role}
                         onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
@@ -1376,6 +1373,20 @@ export default function App() {
                     Apenas administradores podem cadastrar novos operadores.
                   </div>
                 )}
+
+                <div className="pt-4 border-t border-slate-800">
+                  <h3 className="text-xs font-bold text-slate-300 mb-3 tracking-wider">UTILIZADORES CADASTRADOS:</h3>
+                  <ul className="space-y-2 font-mono text-xs">
+                    {usersList.map((u, idx) => (
+                      <li key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between text-sky-300">
+                        <span><strong>{u.name}</strong></span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'ADMIN' ? 'bg-sky-950 text-sky-400 border border-sky-800' : 'bg-emerald-950 text-emerald-400 border border-emerald-800'}`}>
+                          {u.role}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
           )}

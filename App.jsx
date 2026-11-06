@@ -996,12 +996,4 @@ export default function App() {
 }
 
 export default App;
-import ReactDOM from 'react-dom/client';
 
-// Se o import acima der erro por causa da ordem, certifique-se que o ReactDOM está importado no topo, 
-// ou adicione apenas a linha de renderização abaixo no final do ficheiro:
-
-const rootElement = document.getElementById('root');
-if (rootElement && !rootElement._reactRootContainer) {
-  ReactDOM.createRoot(rootElement).render(<App />);
-}   

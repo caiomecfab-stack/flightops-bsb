@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  // Inicialização com persistência local (localStorage) para evitar perdas ao fechar o app
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('can_current_user');
     return saved ? JSON.parse(saved) : { name: 'CAIO', role: 'ADMIN' };
@@ -89,7 +88,6 @@ export default function App() {
   const [dashboardDestinationFilter, setDashboardDestinationFilter] = useState('ALL');
   const [dashboardDebarkFilter, setDashboardDebarkFilter] = useState('ALL');
 
-  // Estado para ativar/gerar as Estatísticas por Aeronave no Dashboard
   const [showStatsReport, setShowStatsReport] = useState(false);
 
   // Filtros de Relatório
@@ -157,7 +155,6 @@ export default function App() {
     bagWeight: '',
     bagCount: '',
     destinationsData: {},
-    debarkCount: '',
     originalText: '',
     embarkedText: ''
   });
@@ -280,6 +277,8 @@ export default function App() {
     const modifierName = currentUser ? currentUser.name : 'CAIO';
     const modificationTime = getFormattedNow();
 
+    const existingFlight = flightList.find(f => f.id === editingId);
+
     const flightData = {
       id: editingId ? editingId : `FL-00${flightList.length + 1}`,
       aircraft: newFlight.aircraft,
@@ -295,7 +294,7 @@ export default function App() {
       totalWeight: (Number(newFlight.paxWeight) || 0) + (Number(newFlight.bagWeight) || 0),
       bagCount: Number(newFlight.bagCount) || 0,
       destinationsData: newFlight.destinationsData || {},
-      debarkCount: Number(newFlight.debarkCount) || 0,
+      debarkCount: existingFlight ? (existingFlight.debarkCount || 0) : 0, // Preserva o desembarque já existente ou 0
       originalList: formOriginalList,
       embarkedList: formEmbarkedList,
       lastModifiedBy: modifierName,
@@ -323,7 +322,6 @@ export default function App() {
       bagWeight: '',
       bagCount: '',
       destinationsData: {},
-      debarkCount: '',
       originalText: '',
       embarkedText: ''
     });
@@ -345,7 +343,6 @@ export default function App() {
       bagWeight: flight.bagWeight,
       bagCount: flight.bagCount,
       destinationsData: flight.destinationsData || {},
-      debarkCount: flight.debarkCount || '',
       originalText: flight.originalList.join('\n'),
       embarkedText: flight.embarkedList.join('\n')
     });
@@ -922,7 +919,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA DESEMBARQUE SIMPLIFICADA (APENAS AERONAVE, DATA, DIA E QTD DESEMBARCADOS) */}
+          {/* ABA DESEMBARQUE (COM AERONAVE, DATA, DIA E QTD DESEMBARCADOS) */}
           {activeTab === 'debark' && (
             <div className="space-y-6 max-w-5xl mx-auto">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
@@ -1465,7 +1462,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR / EDITAR VOO */}
+          {/* ADICIONAR / EDITAR VOO (SEM QUANTIDADE DE DESEMBARCADOS) */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
@@ -1563,17 +1560,6 @@ export default function App() {
                       value={newFlight.paxTotal}
                       onChange={(e) => setNewFlight({ ...newFlight, paxTotal: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono font-bold text-sky-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">QTD DESEMBARCADOS</label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={newFlight.debarkCount}
-                      onChange={(e) => setNewFlight({ ...newFlight, debarkCount: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono font-bold text-cyan-400"
                     />
                   </div>
 
@@ -1703,7 +1689,7 @@ export default function App() {
                     <span className="text-base font-bold text-emerald-400">{formExtras}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">% FALTAS</span>
+                    <span className="text-[10px] text-slate-400_block">% FALTAS</span>
                     <span className="text-base font-bold text-rose-400">{formPercFaltas}%</span>
                   </div>
                 </div>

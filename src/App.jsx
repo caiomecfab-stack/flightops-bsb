@@ -21,22 +21,19 @@ import {
   Lock,
   LogOut,
   UserCheck,
-  Key
+  Key,
+  MapPin
 } from 'lucide-react';
 
 export default function App() {
-  // Sistema de Autenticação e Utilizadores com Admin pré-configurado
   const [currentUser, setCurrentUser] = useState({ name: 'ADMINISTRADOR', role: 'ADMIN' });
   const [authView, setAuthView] = useState('login');
   const [loginInput, setLoginInput] = useState({ user: '', pass: '' });
   
-  // Senha padrão inicial para o Administrador: admin123
   const [usersList, setUsersList] = useState([
     { name: 'ADMINISTRADOR', pass: 'admin123', role: 'ADMIN' }
   ]);
   const [newUserForm, setNewUserForm] = useState({ name: '', pass: '', role: 'OPERADOR' });
-  
-  // Estado para alterar a senha do Admin
   const [adminNewPass, setAdminNewPass] = useState('');
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -53,14 +50,14 @@ export default function App() {
 
   const [newAircraftInput, setNewAircraftInput] = useState('');
 
-  // Estados dos Filtros do Dashboard / Painel
+  // Estados dos Filtros
   const [filterAircraft, setFilterAircraft] = useState('ALL');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterMonthYear, setFilterMonthYear] = useState('');
 
-  // Estados dos Filtros específicos da aba "Imprimir Relatório"
+  // Filtros de Relatório
   const [reportAircraft, setReportAircraft] = useState('ALL');
   const [reportStartDate, setReportStartDate] = useState('');
   const [reportEndDate, setReportEndDate] = useState('');
@@ -72,7 +69,7 @@ export default function App() {
       id: 'FL-001', 
       aircraft: 'C-95 (BANDEIRANTE)', 
       matricula: 'FAB 2110', 
-      route: 'SBBR-SBGO',
+      route: 'SBBR-SBGR-SBGL',
       date: '2026-06-06',
       callTime: '1330',
       takeoffTime: '1530',
@@ -82,6 +79,10 @@ export default function App() {
       bagWeight: 240,
       totalWeight: 1200,
       bagCount: 14,
+      destinationsData: {
+        'SBGR': { pax: 2, weight: 640 },
+        'SBGL': { pax: 1, weight: 320 }
+      },
       originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
       embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA']
     }
@@ -100,6 +101,7 @@ export default function App() {
     paxWeight: '',
     bagWeight: '',
     bagCount: '',
+    destinationsData: {},
     originalText: '',
     embarkedText: ''
   });
@@ -139,6 +141,16 @@ export default function App() {
     const ratio = (plannedDuration / actualDuration) * 100;
     return `${Math.round(ratio)}%`;
   };
+
+  // Extrair aeródromos da rota informada (ex: SBBR-SBGR-SBGL -> Origem: SBBR, Destinos: SBGR, SBGL)
+  const getRouteDestinations = (routeStr) => {
+    if (!routeStr) return [];
+    const parts = routeStr.split('-').map(p => p.trim().toUpperCase()).filter(Boolean);
+    if (parts.length <= 1) return [];
+    return parts.slice(1); // Retorna todos após o primeiro
+  };
+
+  const currentDestinations = getRouteDestinations(newFlight.route);
 
   const cleanNameOnly = (line) => {
     let upper = line.trim().toUpperCase();
@@ -205,6 +217,7 @@ export default function App() {
       bagWeight: Number(newFlight.bagWeight) || 0,
       totalWeight: (Number(newFlight.paxWeight) || 0) + (Number(newFlight.bagWeight) || 0),
       bagCount: Number(newFlight.bagCount) || 0,
+      destinationsData: newFlight.destinationsData || {},
       originalList: formOriginalList,
       embarkedList: formEmbarkedList
     };
@@ -229,6 +242,7 @@ export default function App() {
       paxWeight: '',
       bagWeight: '',
       bagCount: '',
+      destinationsData: {},
       originalText: '',
       embarkedText: ''
     });
@@ -249,6 +263,7 @@ export default function App() {
       paxWeight: flight.paxWeight,
       bagWeight: flight.bagWeight,
       bagCount: flight.bagCount,
+      destinationsData: flight.destinationsData || {},
       originalText: flight.originalList.join('\n'),
       embarkedText: flight.embarkedList.join('\n')
     });
@@ -276,7 +291,6 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchSpecific;
   });
 
-  // Métricas do Dashboard
   const totalFlightsCount = filteredFlights.length;
   const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.paxTotal || f.originalList.length || 0), 0);
   const totalPaxWeightAll = filteredFlights.reduce((acc, f) => acc + f.paxWeight, 0);
@@ -554,7 +568,7 @@ export default function App() {
             </div>
           )}
 
-          {/* DASHBOARD COM GRÁFICOS PROFISSIONAIS REFINADOS */}
+          {/* DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -566,7 +580,6 @@ export default function App() {
                     <span className="text-2xl font-black text-sky-400 font-mono">{totalFlightsCount}</span>
                   </div>
                   <div className="h-40 bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 flex items-end justify-center relative overflow-hidden shadow-inner">
-                    {/* Linhas de grade de fundo profissionais */}
                     <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-20">
                       <div className="border-b border-slate-700 w-full"></div>
                       <div className="border-b border-slate-700 w-full"></div>
@@ -654,7 +667,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS */}
+          {/* PAINEL DE VOOS COM DESTINOS MÚLTIPLOS EXIBIDOS */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -677,6 +690,23 @@ export default function App() {
                           <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
                         </div>
                       </div>
+
+                      {/* Exibição por Destino Separado caso exista */}
+                      {f.destinationsData && Object.keys(f.destinationsData).length > 0 && (
+                        <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
+                          <span className="text-[10px] text-sky-400 font-bold tracking-wider flex items-center">
+                            <MapPin className="w-3 h-3 mr-1" /> PAX / PESO SEPARADO POR DESTINO:
+                          </span>
+                          <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                            {Object.entries(f.destinationsData).map(([dest, info], idx) => (
+                              <div key={idx} className="bg-slate-900 p-2 rounded border border-slate-800">
+                                <span className="text-slate-400 text-[10px] block">DESTINO: {dest}</span>
+                                <span className="text-emerald-400 font-bold">{info.pax || 0} PAX</span> | <span className="text-slate-300">{info.weight || 0} KG</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-3 gap-2 text-center bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs">
                         <div>
@@ -735,7 +765,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA IMPRIMIR RELATÓRIO COM O TÍTULO CORRIGIDO */}
+          {/* ABA IMPRIMIR RELATÓRIO */}
           {activeTab === 'report' && (
             <div className="space-y-6">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
@@ -799,7 +829,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Pré-visualização com apenas o título "RELATÓRIO OPERACIONAL DE VOOS" */}
               <div className="bg-white text-slate-900 p-8 rounded-xl shadow-2xl space-y-6 font-sans">
                 <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-end">
                   <div>
@@ -819,7 +848,7 @@ export default function App() {
                       <tr className="bg-slate-900 text-white border-b border-slate-800">
                         <th className="p-2.5">DATA</th>
                         <th className="p-2.5">AERONAVE / MATR.</th>
-                        <th className="p-2.5">ROTA</th>
+                        <th className="p-2.5">ROTA / DESTINOS</th>
                         <th className="p-2.5 text-center">CHAMADA</th>
                         <th className="p-2.5 text-center">DECOLAGEM</th>
                         <th className="p-2.5 text-center">PAX</th>
@@ -837,7 +866,14 @@ export default function App() {
                           <tr key={f.id} className="hover:bg-slate-50">
                             <td className="p-2.5">{f.date}</td>
                             <td className="p-2.5 font-bold">{f.aircraft} {f.matricula ? `(${f.matricula})` : ''}</td>
-                            <td className="p-2.5">{f.route}</td>
+                            <td className="p-2.5">
+                              {f.route}
+                              {f.destinationsData && Object.keys(f.destinationsData).length > 0 && (
+                                <span className="block text-[10px] text-slate-500">
+                                  {Object.entries(f.destinationsData).map(([d, i]) => `${d}: ${i.pax}pax`).join(' | ')}
+                                </span>
+                              )}
+                            </td>
                             <td className="p-2.5 text-center">{f.callTime || '-'}</td>
                             <td className="p-2.5 text-center">{f.takeoffTime || '-'}</td>
                             <td className="p-2.5 text-center font-bold">{f.paxTotal || f.originalList.length}</td>
@@ -863,7 +899,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ABA UTILIZADORES E DEFINIÇÃO DE SENHA DO ADMIN */}
+          {/* ABA UTILIZADORES */}
           {activeTab === 'users' && (
             <div className="max-w-xl mx-auto space-y-6">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
@@ -990,7 +1026,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR / EDITAR VOO */}
+          {/* ADICIONAR / EDITAR VOO COM DESTINOS MÚLTIPLOS DINÂMICOS */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
@@ -1024,11 +1060,11 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">ROTA (EX: SBBR-SBGO)</label>
+                    <label className="block text-slate-400 mb-1">ROTA (EX: SBBR-SBGR-SBGL)</label>
                     <input 
                       type="text" 
                       required
-                      placeholder="SBBR-SBGO"
+                      placeholder="SBBR-SBGR-SBGL"
                       value={newFlight.route}
                       onChange={(e) => setNewFlight({ ...newFlight, route: e.target.value.toUpperCase() })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono uppercase"
@@ -1134,6 +1170,62 @@ export default function App() {
                     />
                   </div>
                 </div>
+
+                {/* CAIXAS DINÂMICAS PARA DESTINOS MÚLTIPLOS SEPARADOS */}
+                {currentDestinations.length > 0 && (
+                  <div className="bg-slate-950 p-4 rounded-xl border border-sky-900/40 space-y-3">
+                    <span className="text-xs font-bold text-sky-400 flex items-center">
+                      <MapPin className="w-4 h-4 mr-1.5" /> DESTINOS MÚLTIPLOS DETETADOS NA ROTA ({currentDestinations.join(', ')})
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {currentDestinations.map((dest, idx) => (
+                        <div key={idx} className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-2">
+                          <span className="text-xs font-bold text-white block font-mono">DESTINO: {dest}</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-1">PAX PARA {dest}</label>
+                              <input 
+                                type="number" 
+                                placeholder="0"
+                                value={newFlight.destinationsData[dest]?.pax || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setNewFlight({
+                                    ...newFlight,
+                                    destinationsData: {
+                                      ...newFlight.destinationsData,
+                                      [dest]: { ...(newFlight.destinationsData[dest] || {}), pax: val }
+                                    }
+                                  });
+                                }}
+                                className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-white font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] text-slate-400 mb-1">PESO (KG) PARA {dest}</label>
+                              <input 
+                                type="number" 
+                                placeholder="0"
+                                value={newFlight.destinationsData[dest]?.weight || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setNewFlight({
+                                    ...newFlight,
+                                    destinationsData: {
+                                      ...newFlight.destinationsData,
+                                      [dest]: { ...(newFlight.destinationsData[dest] || {}), weight: val }
+                                    }
+                                  });
+                                }}
+                                className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-white font-mono text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
                   <div className="space-y-2">

@@ -11,27 +11,27 @@ import {
   ShieldCheck,
   Menu,
   ChevronLeft,
-  ChevronRight,
-  Database
+  Database,
+  Scale,
+  Briefcase
 } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  // Lista de aeronaves FAB (expansível)
   const [fabAircrafts, setFabAircrafts] = useState([
-    'C-95 (Bandeirante)', 
-    'C-97 (Brasília)', 
-    'C-98 (Caravan)', 
+    'C-95 (BANDEIRANTE)', 
+    'C-97 (BRASÍLIA)', 
+    'C-98 (CARAVAN)', 
     'KC-390', 
-    'C-105 (Amazonas)', 
-    'H-60 (Black Hawk)'
+    'C-105 (AMAZONAS)', 
+    'H-60 (BLACK HAWK)'
   ]);
 
   const [newAircraftInput, setNewAircraftInput] = useState('');
 
-  // Estados dos Filtros do Dashboard/Painel
+  // Estados dos Filtros
   const [filterAircraft, setFilterAircraft] = useState('ALL');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -42,7 +42,7 @@ export default function App() {
   const [flightList, setFlightList] = useState([
     { 
       id: 'FL-001', 
-      aircraft: 'C-95 (Bandeirante)', 
+      aircraft: 'C-95 (BANDEIRANTE)', 
       matricula: 'FAB 2110', 
       route: 'SBBR-SBGO',
       date: '2026-06-06',
@@ -58,7 +58,6 @@ export default function App() {
     }
   ]);
 
-  // Estado para Criar Novo Voo (Matrícula não obrigatória)
   const [newFlight, setNewFlight] = useState({
     aircraft: fabAircrafts[0],
     matricula: '',
@@ -83,7 +82,6 @@ export default function App() {
     return clean;
   };
 
-  // Pré-cálculo em tempo real para o formulário de Adicionar Voo (Copiar/Colar)
   const formOriginalList = newFlight.originalText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
   const formEmbarkedList = newFlight.embarkedText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
   const formTotalPrev = formOriginalList.length;
@@ -105,7 +103,6 @@ export default function App() {
 
   const handleAddFlight = (e) => {
     e.preventDefault();
-
     const flightToAdd = {
       id: `FL-00${flightList.length + 1}`,
       aircraft: newFlight.aircraft,
@@ -138,7 +135,7 @@ export default function App() {
       originalText: '',
       embarkedText: ''
     });
-    setActiveTab('panel');
+    setActiveTab('dashboard');
   };
 
   const handleDeleteFlight = (id) => {
@@ -154,9 +151,12 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchDate && matchMonthYear;
   });
 
-  const totalWeightAll = filteredFlights.reduce((acc, f) => acc + f.totalWeight, 0);
-  const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.originalList.length || 0), 0);
+  // Métricas exatas para o Dashboard
   const totalFlightsCount = filteredFlights.length;
+  const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.originalList.length || 0), 0);
+  const totalPaxWeightAll = filteredFlights.reduce((acc, f) => acc + f.paxWeight, 0);
+  const totalBagWeightAll = filteredFlights.reduce((acc, f) => acc + f.bagWeight, 0);
+  const totalWeightAll = filteredFlights.reduce((acc, f) => acc + f.totalWeight, 0);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans uppercase">
@@ -189,7 +189,7 @@ export default function App() {
 
       {/* Main Container */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar Retrátil */}
+        {/* Sidebar */}
         {sidebarOpen && (
           <aside className="w-64 bg-slate-900/90 border-r border-slate-800 p-4 flex flex-col space-y-2 transition-all duration-300">
             <button 
@@ -197,7 +197,7 @@ export default function App() {
               className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'dashboard' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               <BarChart3 className="w-4 h-4" />
-              <span>Dashboard (Gráficos)</span>
+              <span>Dashboard Interativo</span>
             </button>
 
             <button 
@@ -239,14 +239,9 @@ export default function App() {
         {/* Content Area */}
         <main className="flex-1 p-6 overflow-y-auto bg-slate-950 space-y-6">
           
-          {/* Menu de Abas Alternativo se Sidebar Fechada */}
           {!sidebarOpen && (
             <div className="flex items-center space-x-2 bg-slate-900 border border-slate-800 p-2 rounded-xl">
-              <button 
-                onClick={() => setSidebarOpen(true)}
-                className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700"
-                title="Mostrar Menu"
-              >
+              <button onClick={() => setSidebarOpen(true)} className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">
                 <Menu className="w-4 h-4" />
               </button>
               <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'dashboard' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Dashboard</button>
@@ -256,7 +251,7 @@ export default function App() {
             </div>
           )}
 
-          {/* BARRA DE FILTROS COMUM PARA DASHBOARD E PAINEL */}
+          {/* BARRA DE FILTROS */}
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow space-y-4">
             <div className="flex items-center space-x-2 text-sky-400 text-xs font-bold tracking-wider">
               <Filter className="w-4 h-4" />
@@ -320,52 +315,76 @@ export default function App() {
             </div>
           </div>
 
-          {/* 1. DASHBOARD EXCLUSIVO COM GRÁFICOS E MÉTRICAS */}
+          {/* DASHBOARD PROFISSIONAL E INTERATIVO COM GRÁFICOS DE BARRA */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* 1. Total de Voos */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-sky-500/50 transition-all">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
-                    <span className="flex items-center"><BarChart3 className="w-4 h-4 mr-2 text-sky-400" /> TOTAL DE VOOS FILTRADOS</span>
-                    <span className="text-sky-400 font-mono text-base">{totalFlightsCount}</span>
+                    <span className="flex items-center"><Plane className="w-4 h-4 mr-2 text-sky-400" /> TOTAL DE VOOS</span>
+                    <span className="text-sky-400 font-mono text-lg">{totalFlightsCount}</span>
                   </div>
                   <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-sky-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, totalFlightsCount * 10)}%` }}></div>
+                    <div className="bg-sky-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-sky-500/50" style={{ width: `${Math.min(100, totalFlightsCount * 15)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">VOLUME OPERACIONAL ATIVO NO PERÍODO.</p>
+                  <p className="text-[10px] text-slate-500">MÉTRICA DE MOVIMENTO DE AERONAVES.</p>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow space-y-3">
+                {/* 2. Total de Passageiros (PAX) */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-emerald-500/50 transition-all">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
-                    <span className="flex items-center"><BarChart3 className="w-4 h-4 mr-2 text-emerald-400" /> TOTAL DE PASSAGEIROS (PAX)</span>
-                    <span className="text-emerald-400 font-mono text-base">{totalPaxAll}</span>
+                    <span className="flex items-center"><Users className="w-4 h-4 mr-2 text-emerald-400" /> TOTAL DE PASSAGEIROS (PAX)</span>
+                    <span className="text-emerald-400 font-mono text-lg">{totalPaxAll}</span>
                   </div>
                   <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, totalPaxAll * 2)}%` }}></div>
+                    <div className="bg-emerald-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-emerald-500/50" style={{ width: `${Math.min(100, totalPaxAll * 3)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">SOMA DE EFETIVO PREVISTO TRANSPORTADO.</p>
+                  <p className="text-[10px] text-slate-500">EFETIVO TOTAL PREVISTO E TRANSPORTADO.</p>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow space-y-3">
+                {/* 3. Peso Total PAX */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-indigo-500/50 transition-all">
                   <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
-                    <span className="flex items-center"><BarChart3 className="w-4 h-4 mr-2 text-amber-400" /> PESO TOTAL TRANSPORTADO</span>
-                    <span className="text-amber-400 font-mono text-base">{totalWeightAll} KG</span>
+                    <span className="flex items-center"><Scale className="w-4 h-4 mr-2 text-indigo-400" /> PESO TOTAL PAX</span>
+                    <span className="text-indigo-400 font-mono text-lg">{totalPaxWeightAll} KG</span>
                   </div>
                   <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
-                    <div className="bg-amber-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min(100, totalWeightAll / 50)}%` }}></div>
+                    <div className="bg-indigo-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-indigo-500/50" style={{ width: `${Math.min(100, totalPaxWeightAll / 50)}%` }}></div>
                   </div>
-                  <p className="text-[10px] text-slate-500">CARGA COMBINADA (PAX + BAGAGEM).</p>
+                  <p className="text-[10px] text-slate-500">MASSA COMBINADA DOS PASSAGEIROS.</p>
                 </div>
-              </div>
 
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow text-center space-y-3">
-                <h3 className="text-sm font-bold text-white tracking-wide">INDICADORES GRÁFICOS DO POSTO PR</h3>
-                <p className="text-xs text-slate-400">OS GRÁFICOS ACIMA DEMONSTRAM O FLUXO EM TEMPO REAL CONFORME OS FILTROS SELECIONADOS NA BARRA SUPERIOR.</p>
+                {/* 4. Peso Total de Bagagem */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-amber-500/50 transition-all">
+                  <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                    <span className="flex items-center"><Briefcase className="w-4 h-4 mr-2 text-amber-400" /> PESO TOTAL DE BAGAGEM</span>
+                    <span className="text-amber-400 font-mono text-lg">{totalBagWeightAll} KG</span>
+                  </div>
+                  <div className="w-full bg-slate-950 rounded-full h-4 overflow-hidden p-0.5 border border-slate-800">
+                    <div className="bg-amber-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-amber-500/50" style={{ width: `${Math.min(100, totalBagWeightAll / 30)}%` }}></div>
+                  </div>
+                  <p className="text-[10px] text-slate-500">CARGA DE BAGAGEM REGISTRADA.</p>
+                </div>
+
+                {/* 5. Peso Total Transportado */}
+                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg space-y-3 hover:border-rose-500/50 transition-all lg:col-span-2">
+                  <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                    <span className="flex items-center"><Activity className="w-4 h-4 mr-2 text-rose-400" /> PESO TOTAL TRANSPORTADO</span>
+                    <span className="text-rose-400 font-mono text-xl">{totalWeightAll} KG</span>
+                  </div>
+                  <div className="w-full bg-slate-950 rounded-full h-5 overflow-hidden p-0.5 border border-slate-800">
+                    <div className="bg-gradient-to-r from-rose-600 to-amber-500 h-full rounded-full transition-all duration-500 shadow-lg shadow-rose-500/50" style={{ width: `${Math.min(100, totalWeightAll / 60)}%` }}></div>
+                  </div>
+                  <p className="text-[10px] text-slate-500">SOMA INTEGRAL DE PESO (PAX + BAGAGEM) NO POSTO PR.</p>
+                </div>
+
               </div>
             </div>
           )}
 
-          {/* 2. PAINEL DE VOOS (TABELA SEPARADA) */}
+          {/* PAINEL DE VOOS */}
           {activeTab === 'panel' && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
               <div className="p-4 border-b border-slate-800 flex justify-between items-center">
@@ -380,63 +399,38 @@ export default function App() {
                       <th className="p-3">MATRÍCULA</th>
                       <th className="p-3">ROTA</th>
                       <th className="p-3">DATA</th>
-                      <th className="p-3">CHAMADA</th>
-                      <th className="p-3">DECOLAGEM</th>
-                      <th className="p-3">HORA REAL</th>
                       <th className="p-3 text-center">PAX</th>
                       <th className="p-3 text-center">PESO PAX</th>
                       <th className="p-3 text-center">BAG. (KG)</th>
                       <th className="p-3 text-center">TOTAL (KG)</th>
-                      <th className="p-3 text-center">QTD BAG.</th>
-                      <th className="p-3 text-center">FALTAS</th>
-                      <th className="p-3 text-center">EXTRAS</th>
-                      <th className="p-3 text-center">% FALTAS</th>
                       <th className="p-3 text-right">AÇÃO</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {filteredFlights.map((f) => {
-                      const originalArr = f.originalList || [];
-                      const embarkedArr = f.embarkedList || [];
-                      const totalPrevisto = originalArr.length;
-                      const totalEmbarcadoReal = embarkedArr.length;
-                      
-                      const faltas = Math.max(0, totalPrevisto - totalEmbarcadoReal);
-                      const extras = Math.max(0, totalEmbarcadoReal - totalPrevisto);
-                      const percFaltas = totalPrevisto > 0 ? ((faltas / totalPrevisto) * 100).toFixed(1) : '0.0';
-
-                      return (
-                        <tr key={f.id} className="hover:bg-slate-800/40">
-                          <td className="p-3 text-sky-400 font-bold">{f.aircraft}</td>
-                          <td className="p-3 text-white font-bold">{f.matricula || 'N/D'}</td>
-                          <td className="p-3 text-slate-300">{f.route}</td>
-                          <td className="p-3 text-slate-300">{f.date}</td>
-                          <td className="p-3 text-slate-300">{f.callTime || '-'}</td>
-                          <td className="p-3 text-slate-300">{f.takeoffTime || '-'}</td>
-                          <td className="p-3 text-slate-300">{f.realTime || '-'}</td>
-                          <td className="p-3 text-center text-white">{totalPrevisto}</td>
-                          <td className="p-3 text-center text-slate-300">{f.paxWeight} KG</td>
-                          <td className="p-3 text-center text-slate-300">{f.bagWeight} KG</td>
-                          <td className="p-3 text-center font-bold text-sky-300">{f.totalWeight} KG</td>
-                          <td className="p-3 text-center text-slate-300">{f.bagCount}</td>
-                          <td className="p-3 text-center text-amber-400 font-bold">{faltas}</td>
-                          <td className="p-3 text-center text-emerald-400 font-bold">{extras}</td>
-                          <td className="p-3 text-center text-rose-400">{percFaltas}%</td>
-                          <td className="p-3 text-right">
-                            <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300">
-                              <Trash2 className="w-4 h-4 inline" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {filteredFlights.map((f) => (
+                      <tr key={f.id} className="hover:bg-slate-800/40">
+                        <td className="p-3 text-sky-400 font-bold">{f.aircraft}</td>
+                        <td className="p-3 text-white font-bold">{f.matricula || 'N/D'}</td>
+                        <td className="p-3 text-slate-300">{f.route}</td>
+                        <td className="p-3 text-slate-300">{f.date}</td>
+                        <td className="p-3 text-center text-white">{f.originalList.length}</td>
+                        <td className="p-3 text-center text-slate-300">{f.paxWeight} KG</td>
+                        <td className="p-3 text-center text-slate-300">{f.bagWeight} KG</td>
+                        <td className="p-3 text-center font-bold text-sky-300">{f.totalWeight} KG</td>
+                        <td className="p-3 text-right">
+                          <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300">
+                            <Trash2 className="w-4 h-4 inline" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
           )}
 
-          {/* 3. ADICIONAR AERONAVE */}
+          {/* ADICIONAR AERONAVE */}
           {activeTab === 'aircrafts' && (
             <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
@@ -473,7 +467,7 @@ export default function App() {
             </div>
           )}
 
-          {/* 4. ADICIONAR VOO (MATRÍCULA NÃO OBRIGATÓRIA, CAIXA ALTA E RELATÓRIO DINÂMICO ABAIXO) */}
+          {/* ADICIONAR VOO */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
@@ -585,7 +579,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">TOTAL DE PESO (AUTO: PAX + BAG.)</label>
+                    <label className="block text-slate-400 mb-1">TOTAL DE PESO (AUTO)</label>
                     <input 
                       type="text" 
                       disabled
@@ -635,7 +629,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* RELATÓRIO DINÂMICO DE PASSAGEIROS ABAIXO DAS CAIXAS */}
+                {/* RELATÓRIO DINÂMICO DE PASSAGEIROS */}
                 <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl grid grid-cols-2 sm:grid-cols-5 gap-3 text-center font-mono">
                   <div>
                     <span className="text-[10px] text-slate-400 block">TOTAL PREVISTO</span>
@@ -660,7 +654,7 @@ export default function App() {
                 </div>
 
                 <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors mt-4 tracking-wider">
-                  SALVAR VOY E GERAR RELATÓRIO DO POSTO PR
+                  SALVAR VOO E GERAR RELATÓRIO DO POSTO PR
                 </button>
               </form>
             </div>

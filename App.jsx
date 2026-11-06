@@ -1128,6 +1128,7 @@ const [voos, setVoos] = useState(() => {
 
         </div>
       </main>
-    </div>
-  );
+);
 }
+
+export default App;

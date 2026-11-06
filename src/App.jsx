@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plane, 
   Activity, 
@@ -30,28 +30,51 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  // Utilizador padrão inicial CAIO - ADMINISTRADOR
-  const [currentUser, setCurrentUser] = useState({ name: 'CAIO', role: 'ADMIN' });
+  // Inicialização com persistência local (localStorage) para evitar perdas ao fechar o app
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('can_current_user');
+    return saved ? JSON.parse(saved) : { name: 'CAIO', role: 'ADMIN' };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('can_current_user', JSON.stringify(currentUser));
+  }, [currentUser]);
+
   const [authView, setAuthView] = useState('login');
   const [loginInput, setLoginInput] = useState({ user: '', pass: '' });
   
-  const [usersList, setUsersList] = useState([
-    { name: 'CAIO', pass: 'admin123', role: 'ADMIN' }
-  ]);
+  const [usersList, setUsersList] = useState(() => {
+    const saved = localStorage.getItem('can_users_list');
+    return saved ? JSON.parse(saved) : [
+      { name: 'CAIO', pass: 'admin123', role: 'ADMIN' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('can_users_list', JSON.stringify(usersList));
+  }, [usersList]);
+
   const [newUserForm, setNewUserForm] = useState({ name: '', pass: '', role: 'OPERADOR' });
   const [adminNewPass, setAdminNewPass] = useState('');
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
-  const [fabAircrafts, setFabAircrafts] = useState([
-    'C-95 (BANDEIRANTE)', 
-    'C-97 (BRASÍLIA)', 
-    'C-98 (CARAVAN)', 
-    'KC-390', 
-    'C-105 (AMAZONAS)', 
-    'H-60 (BLACK HAWK)'
-  ]);
+  const [fabAircrafts, setFabAircrafts] = useState(() => {
+    const saved = localStorage.getItem('can_aircrafts');
+    return saved ? JSON.parse(saved) : [
+      'C-95 (BANDEIRANTE)', 
+      'C-97 (BRASÍLIA)', 
+      'C-98 (CARAVAN)', 
+      'KC-390', 
+      'C-105 (AMAZONAS)', 
+      'H-60 (BLACK HAWK)'
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('can_aircrafts', JSON.stringify(fabAircrafts));
+  }, [fabAircrafts]);
 
   const [newAircraftInput, setNewAircraftInput] = useState('');
 
@@ -85,37 +108,44 @@ export default function App() {
   const [selectedDebarkFlightIds, setSelectedDebarkFlightIds] = useState([]);
   const [debarkInputs, setDebarkInputs] = useState({});
 
-  // Estado dos Voos com auditoria de última alteração (quem e quando)
-  const [flightList, setFlightList] = useState([
-    { 
-      id: 'FL-001', 
-      aircraft: 'C-97 (BRASÍLIA)', 
-      matricula: 'FAB 2110', 
-      route: 'SBBR-SBGR-SBGL',
-      date: '2026-06-06',
-      callTime: '1330',
-      takeoffTime: '1530',
-      realTime: '1430',
-      paxTotal: 3,
-      paxWeight: 960,
-      bagWeight: 240,
-      totalWeight: 1200,
-      bagCount: 14,
-      destinationsData: {
-        'SBGR': { pax: 2 },
-        'SBGL': { pax: 1 }
-      },
-      debarkCount: 3,
-      originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
-      embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA'],
-      lastModifiedBy: 'CAIO',
-      lastModifiedAt: '06/06/2026 às 10:30'
-    }
-  ]);
+  // Estado dos Voos com persistência no localStorage
+  const [flightList, setFlightList] = useState(() => {
+    const saved = localStorage.getItem('can_flight_list');
+    return saved ? JSON.parse(saved) : [
+      { 
+        id: 'FL-001', 
+        aircraft: 'C-97 (BRASÍLIA)', 
+        matricula: 'FAB 2110', 
+        route: 'SBBR-SBGR-SBGL',
+        date: '2026-06-06',
+        callTime: '1330',
+        takeoffTime: '1530',
+        realTime: '1430',
+        paxTotal: 3,
+        paxWeight: 960,
+        bagWeight: 240,
+        totalWeight: 1200,
+        bagCount: 14,
+        destinationsData: {
+          'SBGR': { pax: 2 },
+          'SBGL': { pax: 1 }
+        },
+        debarkCount: 3,
+        originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
+        embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA'],
+        lastModifiedBy: 'CAIO',
+        lastModifiedAt: '06/06/2026 às 10:30'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('can_flight_list', JSON.stringify(flightList));
+  }, [flightList]);
 
   const [editingId, setEditingId] = useState(null);
   const [newFlight, setNewFlight] = useState({
-    aircraft: fabAircrafts[0],
+    aircraft: fabAircrafts[0] || 'C-97 (BRASÍLIA)',
     matricula: '',
     route: '',
     date: new Date().toISOString().split('T')[0],
@@ -1018,7 +1048,6 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Campo de input de desembarque dentro do cartão */}
                             <div className="pt-2 flex items-center justify-between bg-slate-900 p-3 rounded-lg border border-slate-800" onClick={(e) => e.stopPropagation()}>
                               <span className="text-xs text-cyan-400 font-mono flex items-center font-bold">
                                 <UserCheck2 className="w-4 h-4 mr-2" /> QTD DESEMBARCADOS:
@@ -1053,7 +1082,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS COM AUDITORIA DE ALTERAÇÃO (QUEM E QUANDO) */}
+          {/* PAINEL DE VOOS COM AUDITORIA DE ALTERAÇÃO */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -1145,7 +1174,6 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* RODAPÉ DO CARTÃO: ÚLTIMA ALTERAÇÃO POR UTILIZADOR E HORÁRIO */}
                       <div className="pt-3 mt-3 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center text-[11px] font-mono text-slate-400 gap-2">
                         <div className="flex items-center space-x-1.5 bg-slate-950 px-2.5 py-1 rounded border border-slate-800 text-sky-300">
                           <User className="w-3.5 h-3.5 text-sky-400" />

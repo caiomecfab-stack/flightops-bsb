@@ -14,7 +14,8 @@ import {
   Scale,
   Briefcase,
   FileSpreadsheet,
-  Edit3
+  Edit3,
+  Zap
 } from 'lucide-react';
 
 export default function App() {
@@ -48,15 +49,15 @@ export default function App() {
       route: 'SBBR-SBGO',
       date: '2026-06-06',
       callTime: '1330',
-      takeoffTime: '1400',
-      realTime: '1420',
+      takeoffTime: '1530',
+      realTime: '1430',
       paxTotal: 3,
       paxWeight: 960,
       bagWeight: 240,
       totalWeight: 1200,
       bagCount: 14,
       originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
-      embarkedList: ['JOAO DA SILVA', 'MARIA OLIVEIRA']
+      embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA']
     }
   ]);
 
@@ -87,20 +88,48 @@ export default function App() {
     return clean;
   };
 
+  // Função para converter HHMM em minutos totais do dia
+  const timeToMinutes = (timeStr) => {
+    if (!timeStr || timeStr.length < 4) return null;
+    const hours = parseInt(timeStr.slice(0, 2), 10);
+    const mins = parseInt(timeStr.slice(2, 4), 10);
+    if (isNaN(hours) || isNaN(mins)) return null;
+    return hours * 60 + mins;
+  };
+
+  // Cálculo do Índice de Efetividade: Tempo Previsto Solo / Tempo Real de Solo
+  const calculateEffectiveness = (flight) => {
+    const callMin = timeToMinutes(flight.callTime);
+    const targetMin = timeToMinutes(flight.takeoffTime);
+    const realMin = timeToMinutes(flight.realTime);
+
+    if (callMin === null || targetMin === null || realMin === null) return 'N/A';
+
+    let plannedDuration = targetMin - callMin;
+    let actualDuration = realMin - callMin;
+
+    if (plannedDuration <= 0) plannedDuration += 24 * 60; // virada de dia
+    if (actualDuration <= 0) actualDuration += 24 * 60;
+
+    if (actualDuration <= 0) return '0%';
+
+    // Eficiência = (Tempo Planejado / Tempo Real Gasto) * 100
+    // Ex: 2 horas planejado (120m) e atendeu em 1 hora (60m) = (120/60)*100 = 200% de efetividade (ou limitado a uma escala lógica)
+    const ratio = (plannedDuration / actualDuration) * 100;
+    return `${Math.round(ratio)}%`;
+  };
+
   // Função auxiliar para remover patentes/postos do início da linha e focar apenas no nome
   const cleanNameOnly = (line) => {
     let upper = line.trim().toUpperCase();
-    // Lista de prefixos comuns a remover (patentes, postos, tratamentos)
     const prefixes = [
       'MA/BR', 'TEN-BRIG', 'MAJ-BRIG', 'CEL', 'TC', 'MAJ', 'CAP', '1º TEN', '2º TEN', 'ASP', 
       'SO', '1S', '2S', '3S', 'CB', 'SGT', 'SATA', 'CIV', 'SR', 'SRA', 'DR', 'DRA', 'SUBTEN'
     ];
     
-    // Remove pontuações extras e divide em palavras
     let words = upper.split(/\s+/);
     while (words.length > 0) {
       let firstWord = words[0].replace(/[^A-Z0-9]/g, '');
-      // Se a primeira palavra for um prefixo ou número de posto (ex: 2S, 1º), remove do array
       if (prefixes.includes(firstWord) || /^\d+[ºO]?[A-Z]*$/.test(firstWord)) {
         words.shift();
       } else {
@@ -115,7 +144,6 @@ export default function App() {
   
   const formTotalPrev = Number(newFlight.paxTotal) || formOriginalList.length;
   
-  // Triangulação ignorando patentes e focando estritamente no nome limpo
   const cleanOriginalNames = formOriginalList.map(cleanNameOnly);
   const cleanEmbarkedNames = formEmbarkedList.map(cleanNameOnly);
 
@@ -464,7 +492,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS EM FORMATO DE CAIXAS */}
+          {/* PAINEL DE VOOS EM FORMATO DE CAIXAS COM ÍNDICE DE EFETIVIDADE AO LADO DA BAGAGEM */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -473,56 +501,65 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredFlights.map((f) => (
-                  <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4 relative hover:border-sky-500/50 transition-all">
-                    <div className="flex justify-between items-start border-b border-slate-800 pb-3">
-                      <div>
-                        <span className="text-sky-400 font-bold text-sm block">{f.aircraft}</span>
-                        <span className="text-slate-400 text-xs font-mono">MATRÍCULA: <strong className="text-white">{f.matricula || 'N/D'}</strong></span>
+                {filteredFlights.map((f) => {
+                  const effectiveness = calculateEffectiveness(f);
+                  return (
+                    <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4 relative hover:border-sky-500/50 transition-all">
+                      <div className="flex justify-between items-start border-b border-slate-800 pb-3">
+                        <div>
+                          <span className="text-sky-400 font-bold text-sm block">{f.aircraft}</span>
+                          <span className="text-slate-400 text-xs font-mono">MATRÍCULA: <strong className="text-white">{f.matricula || 'N/D'}</strong></span>
+                        </div>
+                        <div className="text-right">
+                          <span className="bg-slate-800 px-2.5 py-1 rounded text-xs font-mono text-sky-300 font-bold">{f.route}</span>
+                          <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="bg-slate-800 px-2.5 py-1 rounded text-xs font-mono text-sky-300 font-bold">{f.route}</span>
-                        <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-2 text-center bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs">
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">CHAMADA</span>
-                        <span className="text-slate-200">{f.callTime || '-'}</span>
+                      <div className="grid grid-cols-3 gap-2 text-center bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs">
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">CHAMADA</span>
+                          <span className="text-slate-200">{f.callTime || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">DECOLAGEM</span>
+                          <span className="text-slate-200">{f.takeoffTime || '-'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">HORA REAL</span>
+                          <span className="text-slate-200">{f.realTime || '-'}</span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">DECOLAGEM</span>
-                        <span className="text-slate-200">{f.takeoffTime || '-'}</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">HORA REAL</span>
-                        <span className="text-slate-200">{f.realTime || '-'}</span>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
-                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                        <span className="text-[10px] text-slate-500 block">PAX</span>
-                        <span className="text-white font-bold">{f.paxTotal || f.originalList.length}</span>
+                      <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
+                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                          <span className="text-[10px] text-slate-500 block">PAX</span>
+                          <span className="text-white font-bold">{f.paxTotal || f.originalList.length}</span>
+                        </div>
+                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                          <span className="text-[10px] text-slate-500 block">PESO PAX</span>
+                          <span className="text-slate-300">{f.paxWeight} KG</span>
+                        </div>
+                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                          <span className="text-[10px] text-slate-500 block">BAGAGEM</span>
+                          <span className="text-slate-300">{f.bagWeight} KG</span>
+                        </div>
+                        <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                          <span className="text-[10px] text-slate-500 block">TOTAL</span>
+                          <span className="text-sky-400 font-bold">{f.totalWeight} KG</span>
+                        </div>
                       </div>
-                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                        <span className="text-[10px] text-slate-500 block">PESO PAX</span>
-                        <span className="text-slate-300">{f.paxWeight} KG</span>
-                      </div>
-                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                        <span className="text-[10px] text-slate-500 block">BAGAGEM</span>
-                        <span className="text-slate-300">{f.bagWeight} KG</span>
-                      </div>
-                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                        <span className="text-[10px] text-slate-500 block">TOTAL</span>
-                        <span className="text-sky-400 font-bold">{f.totalWeight} KG</span>
-                      </div>
-                    </div>
 
-                    <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
-                      <span className="text-slate-400 font-mono">QTD BAGAGENS: <strong className="text-white">{f.bagCount}</strong></span>
-                      <div className="flex items-center space-x-3 font-mono">
+                      {/* Linha com Quantidade de Bagagem e Índice de Efetividade ao lado */}
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
+                        <span className="text-slate-400 font-mono">QTD BAGAGENS: <strong className="text-white">{f.bagCount}</strong></span>
+                        <div className="flex items-center space-x-2 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1 rounded-lg">
+                          <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-slate-300 font-mono text-[11px]">EFETIVIDADE: <strong className="text-emerald-400">{effectiveness}</strong></span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end items-center pt-2 border-t border-slate-800/50 text-xs space-x-3 font-mono">
                         <button onClick={() => handleEditFlight(f)} className="text-sky-400 hover:text-sky-300 flex items-center space-x-1">
                           <Edit3 className="w-4 h-4 inline" /> <span>EDITAR</span>
                         </button>
@@ -531,8 +568,8 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -651,10 +688,10 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">HORA DE DECOLAGEM</label>
+                    <label className="block text-slate-400 mb-1">HORA DE DECOLAGEM (PREVISTA)</label>
                     <input 
                       type="text" 
-                      placeholder="1400"
+                      placeholder="1530"
                       value={newFlight.takeoffTime}
                       onChange={(e) => setNewFlight({ ...newFlight, takeoffTime: formatTimeInput(e.target.value) })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
@@ -662,10 +699,10 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">HORA REAL</label>
+                    <label className="block text-slate-400 mb-1">HORA REAL (ATENDIMENTO)</label>
                     <input 
                       type="text" 
-                      placeholder="1420"
+                      placeholder="1430"
                       value={newFlight.realTime}
                       onChange={(e) => setNewFlight({ ...newFlight, realTime: formatTimeInput(e.target.value) })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"

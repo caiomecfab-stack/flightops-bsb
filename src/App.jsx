@@ -12,7 +12,8 @@ import {
   ChevronLeft,
   Database,
   Scale,
-  Briefcase
+  Briefcase,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export default function App() {
@@ -134,7 +135,7 @@ export default function App() {
       originalText: '',
       embarkedText: ''
     });
-    setActiveTab('dashboard');
+    setActiveTab('panel');
   };
 
   const handleDeleteFlight = (id) => {
@@ -157,7 +158,6 @@ export default function App() {
   const totalBagWeightAll = filteredFlights.reduce((acc, f) => acc + f.bagWeight, 0);
   const totalWeightAll = filteredFlights.reduce((acc, f) => acc + f.totalWeight, 0);
 
-  // Valores máximos de referência para proporcionalidade das barras
   const maxFlights = Math.max(10, totalFlightsCount * 1.5);
   const maxPax = Math.max(50, totalPaxAll * 1.5);
   const maxPaxWeight = Math.max(3000, totalPaxWeightAll * 1.5);
@@ -321,19 +321,17 @@ export default function App() {
             </div>
           </div>
 
-          {/* DASHBOARD COM NOMENCLATURA SEPARADA E GRÁFICOS DE BARRAS VERTICAIS ESTILO 3D */}
+          {/* DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
                 {/* 1. Total de Voos */}
                 <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-xl space-y-4 flex flex-col justify-between">
-                  {/* Nomenclatura separada no topo */}
                   <div className="text-center space-y-1 border-b border-slate-800 pb-3">
                     <span className="text-[11px] font-bold text-slate-400 tracking-wider block">TOTAL DE VOOS</span>
                     <span className="text-2xl font-extrabold text-sky-400 font-mono">{totalFlightsCount}</span>
                   </div>
-                  {/* Gráfico 3D Vertical */}
                   <div className="h-44 bg-slate-950/80 rounded-xl border border-slate-800 flex items-end justify-center p-4 relative shadow-inner">
                     <div className="w-16 bg-gradient-to-t from-sky-700 via-sky-500 to-cyan-300 rounded-t-md transition-all duration-700 shadow-xl shadow-sky-500/30 flex items-center justify-center text-xs font-bold text-slate-950 font-mono" style={{ height: `${Math.max(20, (totalFlightsCount / maxFlights) * 100)}%` }}>
                       {totalFlightsCount}
@@ -397,48 +395,70 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS */}
+          {/* PAINEL DE VOOS EM FORMATO DE CAIXAS RETANGULARES */}
           {activeTab === 'panel' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-              <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+            <div className="space-y-4">
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
                 <h2 className="text-xs font-bold text-white tracking-wider">PAINEL DE REGISTO DE VOOS — POSTO PR</h2>
                 <span className="text-xs text-slate-400 font-mono">{filteredFlights.length} REGISTOS</span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs font-mono">
-                  <thead>
-                    <tr className="bg-slate-950 text-slate-400 uppercase border-b border-slate-800">
-                      <th className="p-3">AERONAVE</th>
-                      <th className="p-3">MATRÍCULA</th>
-                      <th className="p-3">ROTA</th>
-                      <th className="p-3">DATA</th>
-                      <th className="p-3 text-center">PAX</th>
-                      <th className="p-3 text-center">PESO PAX</th>
-                      <th className="p-3 text-center">BAG. (KG)</th>
-                      <th className="p-3 text-center">TOTAL (KG)</th>
-                      <th className="p-3 text-right">AÇÃO</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {filteredFlights.map((f) => (
-                      <tr key={f.id} className="hover:bg-slate-800/40">
-                        <td className="p-3 text-sky-400 font-bold">{f.aircraft}</td>
-                        <td className="p-3 text-white font-bold">{f.matricula || 'N/D'}</td>
-                        <td className="p-3 text-slate-300">{f.route}</td>
-                        <td className="p-3 text-slate-300">{f.date}</td>
-                        <td className="p-3 text-center text-white">{f.originalList.length}</td>
-                        <td className="p-3 text-center text-slate-300">{f.paxWeight} KG</td>
-                        <td className="p-3 text-center text-slate-300">{f.bagWeight} KG</td>
-                        <td className="p-3 text-center font-bold text-sky-300">{f.totalWeight} KG</td>
-                        <td className="p-3 text-right">
-                          <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300">
-                            <Trash2 className="w-4 h-4 inline" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredFlights.map((f) => (
+                  <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4 relative hover:border-sky-500/50 transition-all">
+                    <div className="flex justify-between items-start border-b border-slate-800 pb-3">
+                      <div>
+                        <span className="text-sky-400 font-bold text-sm block">{f.aircraft}</span>
+                        <span className="text-slate-400 text-xs font-mono">MATRÍCULA: <strong className="text-white">{f.matricula || 'N/D'}</strong></span>
+                      </div>
+                      <div className="text-right">
+                        <span className="bg-slate-800 px-2.5 py-1 rounded text-xs font-mono text-sky-300 font-bold">{f.route}</span>
+                        <span className="text-[10px] text-slate-500 block mt-1">{f.date}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">CHAMADA</span>
+                        <span className="text-slate-200">{f.callTime || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">DECOLAGEM</span>
+                        <span className="text-slate-200">{f.takeoffTime || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">HORA REAL</span>
+                        <span className="text-slate-200">{f.realTime || '-'}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2 text-center font-mono text-xs">
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">PAX</span>
+                        <span className="text-white font-bold">{f.originalList.length}</span>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">PESO PAX</span>
+                        <span className="text-slate-300">{f.paxWeight} KG</span>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">BAGAGEM</span>
+                        <span className="text-slate-300">{f.bagWeight} KG</span>
+                      </div>
+                      <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
+                        <span className="text-[10px] text-slate-500 block">TOTAL</span>
+                        <span className="text-sky-400 font-bold">{f.totalWeight} KG</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
+                      <span className="text-slate-400 font-mono">QTD BAGAGENS: <strong className="text-white">{f.bagCount}</strong></span>
+                      <button onClick={() => handleDeleteFlight(f.id)} className="text-rose-400 hover:text-rose-300 flex items-center space-x-1 font-mono">
+                        <Trash2 className="w-4 h-4 inline" /> <span>APAGAR</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -480,7 +500,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR VOO */}
+          {/* ADICIONAR VOO (COM TODOS OS ITENS RESTAURADOS) */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">

@@ -80,8 +80,8 @@ export default function App() {
       totalWeight: 1200,
       bagCount: 14,
       destinationsData: {
-        'SBGR': { pax: 2, weight: 640 },
-        'SBGL': { pax: 1, weight: 320 }
+        'SBGR': { pax: 2 },
+        'SBGL': { pax: 1 }
       },
       originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
       embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA']
@@ -142,12 +142,12 @@ export default function App() {
     return `${Math.round(ratio)}%`;
   };
 
-  // Extrair aeródromos da rota informada (ex: SBBR-SBGR-SBGL -> Origem: SBBR, Destinos: SBGR, SBGL)
+  // Regra ajustada: Só exibe múltiplos destinos se houver 3 ou mais aeródromos na rota (ex: A-B-C)
   const getRouteDestinations = (routeStr) => {
     if (!routeStr) return [];
     const parts = routeStr.split('-').map(p => p.trim().toUpperCase()).filter(Boolean);
-    if (parts.length <= 1) return [];
-    return parts.slice(1); // Retorna todos após o primeiro
+    if (parts.length < 3) return []; // Requer pelo menos 3 aeródromos
+    return parts.slice(1);
   };
 
   const currentDestinations = getRouteDestinations(newFlight.route);
@@ -667,7 +667,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS COM DESTINOS MÚLTIPLOS EXIBIDOS */}
+          {/* PAINEL DE VOOS COM DESTINOS MÚLTIPLOS (EXIBINDO APENAS PAX POR DESTINO) */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -691,17 +691,16 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Exibição por Destino Separado caso exista */}
                       {f.destinationsData && Object.keys(f.destinationsData).length > 0 && (
                         <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-2">
                           <span className="text-[10px] text-sky-400 font-bold tracking-wider flex items-center">
-                            <MapPin className="w-3 h-3 mr-1" /> PAX / PESO SEPARADO POR DESTINO:
+                            <MapPin className="w-3 h-3 mr-1" /> QUANTIDADE DE PASSAGEIROS POR DESTINO:
                           </span>
                           <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                             {Object.entries(f.destinationsData).map(([dest, info], idx) => (
                               <div key={idx} className="bg-slate-900 p-2 rounded border border-slate-800">
                                 <span className="text-slate-400 text-[10px] block">DESTINO: {dest}</span>
-                                <span className="text-emerald-400 font-bold">{info.pax || 0} PAX</span> | <span className="text-slate-300">{info.weight || 0} KG</span>
+                                <span className="text-emerald-400 font-bold">{info.pax || 0} PAX</span>
                               </div>
                             ))}
                           </div>
@@ -870,7 +869,7 @@ export default function App() {
                               {f.route}
                               {f.destinationsData && Object.keys(f.destinationsData).length > 0 && (
                                 <span className="block text-[10px] text-slate-500">
-                                  {Object.entries(f.destinationsData).map(([d, i]) => `${d}: ${i.pax}pax`).join(' | ')}
+                                  {Object.entries(f.destinationsData).map(([d, i]) => `${d}: ${i.pax} PAX`).join(' | ')}
                                 </span>
                               )}
                             </td>
@@ -1026,7 +1025,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR / EDITAR VOO COM DESTINOS MÚLTIPLOS DINÂMICOS */}
+          {/* ADICIONAR / EDITAR VOO COM DESTINOS MÚLTIPLOS A PARTIR DA 3ª ROTA (APENAS PAX) */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
@@ -1171,55 +1170,34 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* CAIXAS DINÂMICAS PARA DESTINOS MÚLTIPLOS SEPARADOS */}
+                {/* CAIXAS DINÂMICAS PARA DESTINOS MÚLTIPLOS (APENAS PAX A PARTIR DA 3ª ROTA) */}
                 {currentDestinations.length > 0 && (
                   <div className="bg-slate-950 p-4 rounded-xl border border-sky-900/40 space-y-3">
                     <span className="text-xs font-bold text-sky-400 flex items-center">
-                      <MapPin className="w-4 h-4 mr-1.5" /> DESTINOS MÚLTIPLOS DETETADOS NA ROTA ({currentDestinations.join(', ')})
+                      <MapPin className="w-4 h-4 mr-1.5" /> DESTINOS MÚLTIPLOS DETETADOS NA ROTA (3º AERÓDROMO OU SUPERIOR: {currentDestinations.join(', ')})
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {currentDestinations.map((dest, idx) => (
                         <div key={idx} className="bg-slate-900 p-3 rounded-lg border border-slate-800 space-y-2">
                           <span className="text-xs font-bold text-white block font-mono">DESTINO: {dest}</span>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-[10px] text-slate-400 mb-1">PAX PARA {dest}</label>
-                              <input 
-                                type="number" 
-                                placeholder="0"
-                                value={newFlight.destinationsData[dest]?.pax || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setNewFlight({
-                                    ...newFlight,
-                                    destinationsData: {
-                                      ...newFlight.destinationsData,
-                                      [dest]: { ...(newFlight.destinationsData[dest] || {}), pax: val }
-                                    }
-                                  });
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-white font-mono text-xs"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] text-slate-400 mb-1">PESO (KG) PARA {dest}</label>
-                              <input 
-                                type="number" 
-                                placeholder="0"
-                                value={newFlight.destinationsData[dest]?.weight || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setNewFlight({
-                                    ...newFlight,
-                                    destinationsData: {
-                                      ...newFlight.destinationsData,
-                                      [dest]: { ...(newFlight.destinationsData[dest] || {}), weight: val }
-                                    }
-                                  });
-                                }}
-                                className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-white font-mono text-xs"
-                              />
-                            </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-400 mb-1">QUANTIDADE DE PAX PARA {dest}</label>
+                            <input 
+                              type="number" 
+                              placeholder="0"
+                              value={newFlight.destinationsData[dest]?.pax || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setNewFlight({
+                                  ...newFlight,
+                                  destinationsData: {
+                                    ...newFlight.destinationsData,
+                                    [dest]: { pax: val }
+                                  }
+                                });
+                              }}
+                              className="w-full bg-slate-950 border border-slate-800 rounded p-2 text-white font-mono text-xs font-bold text-emerald-400"
+                            />
                           </div>
                         </div>
                       ))}

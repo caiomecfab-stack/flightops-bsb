@@ -20,18 +20,24 @@ import {
   UserPlus,
   Lock,
   LogOut,
-  UserCheck
+  UserCheck,
+  Key
 } from 'lucide-react';
 
 export default function App() {
-  // Sistema de Autenticação e Utilizadores
+  // Sistema de Autenticação e Utilizadores com Admin pré-configurado
   const [currentUser, setCurrentUser] = useState({ name: 'ADMINISTRADOR', role: 'ADMIN' });
-  const [authView, setAuthView] = useState('login'); // 'login' ou 'register'
+  const [authView, setAuthView] = useState('login');
   const [loginInput, setLoginInput] = useState({ user: '', pass: '' });
+  
+  // Senha padrão inicial para o Administrador: admin123
   const [usersList, setUsersList] = useState([
     { name: 'ADMINISTRADOR', pass: 'admin123', role: 'ADMIN' }
   ]);
   const [newUserForm, setNewUserForm] = useState({ name: '', pass: '', role: 'OPERADOR' });
+  
+  // Estado para alterar a senha do Admin
+  const [adminNewPass, setAdminNewPass] = useState('');
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -81,7 +87,6 @@ export default function App() {
     }
   ]);
 
-  // Estado para Criar/Editar Voo
   const [editingId, setEditingId] = useState(null);
   const [newFlight, setNewFlight] = useState({
     aircraft: fabAircrafts[0],
@@ -254,7 +259,6 @@ export default function App() {
     setFlightList(flightList.filter(f => f.id !== id));
   };
 
-  // Filtragem Geral (Dashboard e Painel)
   const filteredFlights = flightList.filter(flight => {
     const matchAircraft = filterAircraft === 'ALL' || flight.aircraft === filterAircraft;
     const matchStartDate = !filterStartDate || flight.date >= filterStartDate;
@@ -264,7 +268,6 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchDate && matchMonthYear;
   });
 
-  // Filtragem específica para a aba "Imprimir Relatório"
   const reportFilteredFlights = flightList.filter(flight => {
     const matchAircraft = reportAircraft === 'ALL' || flight.aircraft === reportAircraft;
     const matchStartDate = !reportStartDate || flight.date >= reportStartDate;
@@ -286,7 +289,6 @@ export default function App() {
   const maxBagWeight = Math.max(1000, totalBagWeightAll * 1.5);
   const maxTotalWeight = Math.max(4000, totalWeightAll * 1.5);
 
-  // Gestão de Utilizadores
   const handleRegisterUser = (e) => {
     e.preventDefault();
     if (!newUserForm.name || !newUserForm.pass) return;
@@ -307,11 +309,18 @@ export default function App() {
       setCurrentUser(found);
       setLoginInput({ user: '', pass: '' });
     } else {
-      alert('Utilizador ou senha incorretos!');
+      alert('Utilizador ou senha incorretos! (Nota: A senha padrão inicial do Administrador é admin123)');
     }
   };
 
-  // Se não houver utilizador autenticado logado, exibe tela de Login / Registo
+  const handleChangeAdminPassword = (e) => {
+    e.preventDefault();
+    if (!adminNewPass) return;
+    setUsersList(usersList.map(u => u.name === 'ADMINISTRADOR' ? { ...u, pass: adminNewPass } : u));
+    setAdminNewPass('');
+    alert('Senha do Administrador alterada com sucesso!');
+  };
+
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans uppercase p-4">
@@ -324,6 +333,10 @@ export default function App() {
             <p className="text-xs text-slate-400 font-mono">Base Aérea de Brasília (SBBR)</p>
           </div>
 
+          <div className="bg-slate-950 p-3 rounded-xl border border-sky-900/40 text-[11px] text-sky-300 font-mono">
+            ℹ️ <strong>Credencial padrão inicial:</strong> Utilizador: <strong>ADMINISTRADOR</strong> | Senha: <strong>admin123</strong>
+          </div>
+
           {authView === 'login' ? (
             <form onSubmit={handleLogin} className="space-y-4 text-xs">
               <div>
@@ -331,7 +344,7 @@ export default function App() {
                 <input 
                   type="text" 
                   required
-                  placeholder="DIGITE SEU NOME"
+                  placeholder="EX: ADMINISTRADOR"
                   value={loginInput.user}
                   onChange={(e) => setLoginInput({ ...loginInput, user: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase font-mono"
@@ -351,61 +364,8 @@ export default function App() {
               <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors tracking-wider">
                 ENTRAR NO SISTEMA
               </button>
-              <div className="text-center pt-2">
-                <button type="button" onClick={() => setAuthView('register')} className="text-sky-400 hover:text-sky-300 text-xs normal-case">
-                  Não tem conta? Registar primeiro utilizador / operador
-                </button>
-              </div>
             </form>
-          ) : (
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              handleRegisterUser(e);
-              setAuthView('login');
-            }} className="space-y-4 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1">NOME DO UTILIZADOR</label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="EX: SGT SILVA"
-                  value={newUserForm.name}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">SENHA</label>
-                <input 
-                  type="password" 
-                  required
-                  placeholder="••••••••"
-                  value={newUserForm.pass}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, pass: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-slate-400 mb-1">PERFIL DE ACESSO</label>
-                <select 
-                  value={newUserForm.role}
-                  onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase"
-                >
-                  <option value="ADMIN">ADMINISTRADOR</option>
-                  <option value="OPERADOR">OPERADOR</option>
-                </select>
-              </div>
-              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-colors tracking-wider">
-                CADASTRAR UTILIZADOR
-              </button>
-              <div className="text-center pt-2">
-                <button type="button" onClick={() => setAuthView('login')} className="text-sky-400 hover:text-sky-300 text-xs normal-case">
-                  Voltar ao login
-                </button>
-              </div>
-            </form>
-          )}
+          ) : null}
         </div>
       </div>
     );
@@ -483,7 +443,6 @@ export default function App() {
               <span>Adicionar Aeronave</span>
             </button>
 
-            {/* NOVA OPÇÃO: IMPRIMIR RELATÓRIO */}
             <button 
               onClick={() => setActiveTab('report')}
               className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'report' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -492,7 +451,6 @@ export default function App() {
               <span>Imprimir Relatório</span>
             </button>
 
-            {/* NOVA OPÇÃO: GESTÃO DE UTILIZADORES */}
             <button 
               onClick={() => setActiveTab('users')}
               className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'users' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
@@ -530,7 +488,7 @@ export default function App() {
             </div>
           )}
 
-          {/* BARRA DE FILTROS GERAIS (Exibida no Dashboard e Painel) */}
+          {/* BARRA DE FILTROS GERAIS */}
           {(activeTab === 'dashboard' || activeTab === 'panel') && (
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow space-y-4">
               <div className="flex items-center space-x-2 text-sky-400 text-xs font-bold tracking-wider">
@@ -596,71 +554,97 @@ export default function App() {
             </div>
           )}
 
-          {/* DASHBOARD */}
+          {/* DASHBOARD COM GRÁFICOS PROFISSIONAIS REFINADOS */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
                 {/* 1. Total de Voos */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-xl space-y-4 flex flex-col justify-between">
-                  <div className="text-center space-y-1 border-b border-slate-800 pb-3">
-                    <span className="text-[11px] font-bold text-slate-400 tracking-wider block">TOTAL DE VOOS</span>
-                    <span className="text-2xl font-extrabold text-sky-400 font-mono">{totalFlightsCount}</span>
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <span className="text-xs font-extrabold text-slate-400 tracking-wider">TOTAL DE VOOS</span>
+                    <span className="text-2xl font-black text-sky-400 font-mono">{totalFlightsCount}</span>
                   </div>
-                  <div className="h-44 bg-slate-950/80 rounded-xl border border-slate-800 flex items-end justify-center p-4 relative shadow-inner">
-                    <div className="w-16 bg-gradient-to-t from-sky-700 via-sky-500 to-cyan-300 rounded-t-md transition-all duration-700 shadow-xl shadow-sky-500/30 flex items-center justify-center text-xs font-bold text-slate-950 font-mono" style={{ height: `${Math.max(20, (totalFlightsCount / maxFlights) * 100)}%` }}>
+                  <div className="h-40 bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 flex items-end justify-center relative overflow-hidden shadow-inner">
+                    {/* Linhas de grade de fundo profissionais */}
+                    <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-20">
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                    </div>
+                    <div className="w-14 bg-gradient-to-t from-sky-700 via-sky-500 to-cyan-300 rounded-t-lg shadow-2xl shadow-sky-500/40 flex items-center justify-center text-xs font-bold text-slate-950 font-mono transition-all duration-700 z-10" style={{ height: `${Math.max(25, (totalFlightsCount / maxFlights) * 100)}%` }}>
                       {totalFlightsCount}
                     </div>
                   </div>
                 </div>
 
                 {/* 2. Total de Passageiros (PAX) */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-xl space-y-4 flex flex-col justify-between">
-                  <div className="text-center space-y-1 border-b border-slate-800 pb-3">
-                    <span className="text-[11px] font-bold text-slate-400 tracking-wider block">TOTAL DE PASSAGEIROS (PAX)</span>
-                    <span className="text-2xl font-extrabold text-emerald-400 font-mono">{totalPaxAll}</span>
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <span className="text-xs font-extrabold text-slate-400 tracking-wider">TOTAL DE PASSAGEIROS (PAX)</span>
+                    <span className="text-2xl font-black text-emerald-400 font-mono">{totalPaxAll}</span>
                   </div>
-                  <div className="h-44 bg-slate-950/80 rounded-xl border border-slate-800 flex items-end justify-center p-4 relative shadow-inner">
-                    <div className="w-16 bg-gradient-to-t from-emerald-700 via-emerald-500 to-teal-300 rounded-t-md transition-all duration-700 shadow-xl shadow-emerald-500/30 flex items-center justify-center text-xs font-bold text-slate-950 font-mono" style={{ height: `${Math.max(20, (totalPaxAll / maxPax) * 100)}%` }}>
+                  <div className="h-40 bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 flex items-end justify-center relative overflow-hidden shadow-inner">
+                    <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-20">
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                    </div>
+                    <div className="w-14 bg-gradient-to-t from-emerald-700 via-emerald-500 to-teal-300 rounded-t-lg shadow-2xl shadow-emerald-500/40 flex items-center justify-center text-xs font-bold text-slate-950 font-mono transition-all duration-700 z-10" style={{ height: `${Math.max(25, (totalPaxAll / maxPax) * 100)}%` }}>
                       {totalPaxAll}
                     </div>
                   </div>
                 </div>
 
                 {/* 3. Peso Total PAX */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-xl space-y-4 flex flex-col justify-between">
-                  <div className="text-center space-y-1 border-b border-slate-800 pb-3">
-                    <span className="text-[11px] font-bold text-slate-400 tracking-wider block">PESO TOTAL PAX</span>
-                    <span className="text-2xl font-extrabold text-indigo-400 font-mono">{totalPaxWeightAll} KG</span>
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <span className="text-xs font-extrabold text-slate-400 tracking-wider">PESO TOTAL PAX</span>
+                    <span className="text-2xl font-black text-indigo-400 font-mono">{totalPaxWeightAll} KG</span>
                   </div>
-                  <div className="h-44 bg-slate-950/80 rounded-xl border border-slate-800 flex items-end justify-center p-4 relative shadow-inner">
-                    <div className="w-16 bg-gradient-to-t from-indigo-700 via-indigo-500 to-blue-300 rounded-t-md transition-all duration-700 shadow-xl shadow-indigo-500/30 flex items-center justify-center text-xs font-bold text-slate-950 font-mono" style={{ height: `${Math.max(20, (totalPaxWeightAll / maxPaxWeight) * 100)}%` }}>
+                  <div className="h-40 bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 flex items-end justify-center relative overflow-hidden shadow-inner">
+                    <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-20">
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                    </div>
+                    <div className="w-14 bg-gradient-to-t from-indigo-700 via-indigo-500 to-blue-300 rounded-t-lg shadow-2xl shadow-indigo-500/40 flex items-center justify-center text-xs font-bold text-slate-950 font-mono transition-all duration-700 z-10" style={{ height: `${Math.max(25, (totalPaxWeightAll / maxPaxWeight) * 100)}%` }}>
                       {totalPaxWeightAll}
                     </div>
                   </div>
                 </div>
 
                 {/* 4. Peso Total de Bagagem */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-xl space-y-4 flex flex-col justify-between">
-                  <div className="text-center space-y-1 border-b border-slate-800 pb-3">
-                    <span className="text-[11px] font-bold text-slate-400 tracking-wider block">PESO TOTAL DE BAGAGEM</span>
-                    <span className="text-2xl font-extrabold text-amber-400 font-mono">{totalBagWeightAll} KG</span>
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <span className="text-xs font-extrabold text-slate-400 tracking-wider">PESO TOTAL DE BAGAGEM</span>
+                    <span className="text-2xl font-black text-amber-400 font-mono">{totalBagWeightAll} KG</span>
                   </div>
-                  <div className="h-44 bg-slate-950/80 rounded-xl border border-slate-800 flex items-end justify-center p-4 relative shadow-inner">
-                    <div className="w-16 bg-gradient-to-t from-amber-700 via-amber-500 to-yellow-300 rounded-t-md transition-all duration-700 shadow-xl shadow-amber-500/30 flex items-center justify-center text-xs font-bold text-slate-950 font-mono" style={{ height: `${Math.max(20, (totalBagWeightAll / maxBagWeight) * 100)}%` }}>
+                  <div className="h-40 bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 flex items-end justify-center relative overflow-hidden shadow-inner">
+                    <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-20">
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                    </div>
+                    <div className="w-14 bg-gradient-to-t from-amber-700 via-amber-500 to-yellow-300 rounded-t-lg shadow-2xl shadow-amber-500/40 flex items-center justify-center text-xs font-bold text-slate-950 font-mono transition-all duration-700 z-10" style={{ height: `${Math.max(25, (totalBagWeightAll / maxBagWeight) * 100)}%` }}>
                       {totalBagWeightAll}
                     </div>
                   </div>
                 </div>
 
                 {/* 5. Peso Total Transportado */}
-                <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-xl space-y-4 lg:col-span-2 flex flex-col justify-between">
-                  <div className="text-center space-y-1 border-b border-slate-800 pb-3">
-                    <span className="text-[11px] font-bold text-slate-400 tracking-wider block">PESO TOTAL TRANSPORTADO</span>
-                    <span className="text-2xl font-extrabold text-rose-400 font-mono">{totalWeightAll} KG</span>
+                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 lg:col-span-2 flex flex-col justify-between">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <span className="text-xs font-extrabold text-slate-400 tracking-wider">PESO TOTAL TRANSPORTADO</span>
+                    <span className="text-2xl font-black text-rose-400 font-mono">{totalWeightAll} KG</span>
                   </div>
-                  <div className="h-44 bg-slate-950/80 rounded-xl border border-slate-800 flex items-end justify-center p-4 relative shadow-inner">
-                    <div className="w-24 bg-gradient-to-t from-rose-700 via-rose-500 to-amber-300 rounded-t-md transition-all duration-700 shadow-xl shadow-rose-500/30 flex items-center justify-center text-xs font-bold text-white font-mono" style={{ height: `${Math.max(20, (totalWeightAll / maxTotalWeight) * 100)}%` }}>
+                  <div className="h-40 bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 flex items-end justify-center relative overflow-hidden shadow-inner">
+                    <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-20">
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                      <div className="border-b border-slate-700 w-full"></div>
+                    </div>
+                    <div className="w-24 bg-gradient-to-t from-rose-700 via-rose-500 to-amber-300 rounded-t-lg shadow-2xl shadow-rose-500/40 flex items-center justify-center text-xs font-bold text-white font-mono transition-all duration-700 z-10" style={{ height: `${Math.max(25, (totalWeightAll / maxTotalWeight) * 100)}%` }}>
                       {totalWeightAll} KG
                     </div>
                   </div>
@@ -751,7 +735,7 @@ export default function App() {
             </div>
           )}
 
-          {/* NOVA ABA: IMPRIMIR RELATÓRIO COM FILTROS PRÓPRIOS */}
+          {/* ABA IMPRIMIR RELATÓRIO COM O TÍTULO CORRIGIDO */}
           {activeTab === 'report' && (
             <div className="space-y-6">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
@@ -768,7 +752,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Filtros específicos do Relatório */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-2 text-xs">
                   <div>
                     <label className="block text-slate-400 mb-1">Aeronave FAB</label>
@@ -816,13 +799,13 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Pré-visualização do Relatório Impresso */}
+              {/* Pré-visualização com apenas o título "RELATÓRIO OPERACIONAL DE VOOS" */}
               <div className="bg-white text-slate-900 p-8 rounded-xl shadow-2xl space-y-6 font-sans">
                 <div className="border-b-2 border-slate-900 pb-4 flex justify-between items-end">
                   <div>
                     <h1 className="text-xl font-black">COMANDO DA AERONÁUTICA</h1>
                     <h2 className="text-sm font-bold text-slate-700">BASE AÉREA DE BRASÍLIA — POSTO CAN BR</h2>
-                    <p className="text-xs text-slate-500">Relatório Operacional de Voos e Cargas</p>
+                    <p className="text-xs text-slate-500">Relatório Operacional de Voos</p>
                   </div>
                   <div className="text-right text-xs font-mono text-slate-600">
                     <p>EMITIDO EM: {new Date().toLocaleDateString('pt-BR')}</p>
@@ -880,71 +863,83 @@ export default function App() {
             </div>
           )}
 
-          {/* NOVA ABA: GESTÃO DE UTILIZADORES (APENAS PARA ADMINS OU REGISTO) */}
+          {/* ABA UTILIZADORES E DEFINIÇÃO DE SENHA DO ADMIN */}
           {activeTab === 'users' && (
-            <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
-              <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
-                <Users className="w-4 h-4 mr-2 text-sky-400" /> GESTÃO DE UTILIZADORES — POSTO CAN BR
-              </h2>
-              
-              {currentUser.role === 'ADMIN' ? (
-                <form onSubmit={handleRegisterUser} className="space-y-4 text-xs">
+            <div className="max-w-xl mx-auto space-y-6">
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
+                <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
+                  <Key className="w-4 h-4 mr-2 text-sky-400" /> SEGURANÇA E SENHA DO ADMINISTRADOR
+                </h2>
+                <form onSubmit={handleChangeAdminPassword} className="space-y-4 text-xs">
+                  <p className="text-slate-400 text-[11px] font-sans normal-case">
+                    A senha padrão inicial do Administrador é <strong className="text-white">admin123</strong>. Utilize o formulário abaixo para definir a sua senha personalizada de Administrador.
+                  </p>
                   <div>
-                    <label className="block text-slate-400 mb-1">NOME DO NOVO UTILIZADOR</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="EX: 2S OLIVEIRA"
-                      value={newUserForm.name}
-                      onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-400 mb-1">SENHA DE ACESSO</label>
+                    <label className="block text-slate-400 mb-1">NOVA SENHA PARA O ADMINISTRADOR</label>
                     <input 
                       type="password" 
                       required
-                      placeholder="••••••••"
-                      value={newUserForm.pass}
-                      onChange={(e) => setNewUserForm({ ...newUserForm, pass: e.target.value })}
+                      placeholder="DIGITE A NOVA SENHA"
+                      value={adminNewPass}
+                      onChange={(e) => setAdminNewPass(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white font-mono"
                     />
                   </div>
-                  <div>
-                    <label className="block text-slate-400 mb-1">PERFIL</label>
-                    <select 
-                      value={newUserForm.role}
-                      onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase"
-                    >
-                      <option value="OPERADOR">OPERADOR</option>
-                      <option value="ADMIN">ADMINISTRADOR</option>
-                    </select>
-                  </div>
                   <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors tracking-wider">
-                    CADASTRAR NOVO UTILIZADOR
+                    ATUALIZAR SENHA DO ADMINISTRADOR
                   </button>
                 </form>
-              ) : (
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-amber-400 font-mono">
-                  Apenas utilizadores com perfil de Administrador podem cadastrar novos operadores.
-                </div>
-              )}
+              </div>
 
-              <div className="pt-4 border-t border-slate-800">
-                <h3 className="text-xs font-bold text-slate-300 mb-3 tracking-wider">UTILIZADORES REGISTADOS NO SISTEMA:</h3>
-                <ul className="space-y-2 font-mono text-xs">
-                  {usersList.map((u, idx) => (
-                    <li key={idx} className="bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between text-sky-300">
-                      <div>
-                        <span className="font-bold text-white">{u.name}</span>
-                        <span className="text-[10px] text-slate-400 block">FUNÇÃO: {u.role}</span>
-                      </div>
-                      <UserCheck className="w-4 h-4 text-emerald-400" />
-                    </li>
-                  ))}
-                </ul>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
+                <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
+                  <UserPlus className="w-4 h-4 mr-2 text-emerald-400" /> CADASTRAR NOVO UTILIZADOR / OPERADOR
+                </h2>
+                
+                {currentUser.role === 'ADMIN' ? (
+                  <form onSubmit={handleRegisterUser} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block text-slate-400 mb-1">NOME DO UTILIZADOR</label>
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="EX: 2S OLIVEIRA"
+                        value={newUserForm.name}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">SENHA DE ACESSO</label>
+                      <input 
+                        type="password" 
+                        required
+                        placeholder="••••••••"
+                        value={newUserForm.pass}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, pass: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 mb-1">PERFIL</label>
+                      <select 
+                        value={newUserForm.role}
+                        onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white uppercase"
+                      >
+                        <option value="OPERADOR">OPERADOR</option>
+                        <option value="ADMIN">ADMINISTRADOR</option>
+                      </select>
+                    </div>
+                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-colors tracking-wider">
+                      CADASTRAR UTILIZADOR
+                    </button>
+                  </form>
+                ) : (
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs text-amber-400 font-mono">
+                    Apenas administradores podem cadastrar novos operadores.
+                  </div>
+                )}
               </div>
             </div>
           )}

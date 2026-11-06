@@ -25,8 +25,7 @@ import {
   MapPin,
   Calendar,
   UserCheck2,
-  CheckSquare,
-  Square
+  PieChart
 } from 'lucide-react';
 
 export default function App() {
@@ -54,18 +53,19 @@ export default function App() {
 
   const [newAircraftInput, setNewAircraftInput] = useState('');
 
-  // Estados dos Filtros Gerais
+  // Estados dos Filtros Gerais (mesmo cabeçalho do topo)
   const [filterAircraft, setFilterAircraft] = useState('ALL');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterMonthYear, setFilterMonthYear] = useState('');
 
-  // Filtro Específico do Dashboard por Localidade/Destino
+  // Filtro Específico do Dashboard por Localidade/Destino e Desembarque
   const [dashboardDestinationFilter, setDashboardDestinationFilter] = useState('ALL');
-  
-  // Novo Filtro de Desembarque no Dashboard
   const [dashboardDebarkFilter, setDashboardDebarkFilter] = useState('ALL');
+
+  // Estado para ativar/gerar as Estatísticas por Aeronave no Dashboard
+  const [showStatsReport, setShowStatsReport] = useState(false);
 
   // Filtros de Relatório
   const [reportAircraft, setReportAircraft] = useState('ALL');
@@ -73,11 +73,11 @@ export default function App() {
   const [reportEndDate, setReportEndDate] = useState('');
   const [reportSpecificDate, setReportSpecificDate] = useState('');
 
-  // Estados da Nova Aba Desembarque
+  // Estados da Aba Desembarque Múltiplo
   const [debarkFilterDate, setDebarkFilterDate] = useState('');
   const [debarkFilterAircraft, setDebarkFilterAircraft] = useState('ALL');
   const [selectedDebarkFlightIds, setSelectedDebarkFlightIds] = useState([]);
-  const [debarkInputs, setDebarkInputs] = useState({}); // Armazena { [flightId]: quantidadeDesembarcados }
+  const [debarkInputs, setDebarkInputs] = useState({});
 
   // Estado dos Voos
   const [flightList, setFlightList] = useState([
@@ -99,7 +99,7 @@ export default function App() {
         'SBGR': { pax: 2 },
         'SBGL': { pax: 1 }
       },
-      debarkCount: 3, // Quantidade de desembarcados registada
+      debarkCount: 3,
       originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
       embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA']
     }
@@ -306,7 +306,6 @@ export default function App() {
     setFlightList(flightList.filter(f => f.id !== id));
   };
 
-  // Guardar Desembarques Múltiplos selecionados na aba Desembarque
   const handleSaveBatchDebark = (e) => {
     e.preventDefault();
     if (selectedDebarkFlightIds.length === 0) {
@@ -353,14 +352,21 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchSpecific;
   });
 
-  // Voos filtrados especificamente para a aba Desembarque
   const debarkTabFilteredFlights = flightList.filter(f => {
     const matchDate = !debarkFilterDate || f.date === debarkFilterDate;
     const matchAc = debarkFilterAircraft === 'ALL' || f.aircraft === debarkFilterAircraft;
     return matchDate && matchAc;
   });
 
-  // Métricas do Dashboard
+  // Cálculo Estatístico por Tipo de Aeronave com base nos mesmos filtros do topo
+  const statsByAircraft = fabAircrafts.map(ac => {
+    const acFlights = filteredFlights.filter(f => f.aircraft === ac);
+    const flightsCount = acFlights.length;
+    const totalPax = acFlights.reduce((acc, f) => acc + (f.paxTotal || f.originalList.length || 0), 0);
+    const totalDebark = acFlights.reduce((acc, f) => acc + (Number(f.debarkCount) || 0), 0);
+    return { aircraft: ac, flightsCount, totalPax, totalDebark };
+  }).filter(stat => stat.flightsCount > 0);
+
   const totalFlightsCount = filteredFlights.length;
   
   const totalPaxAll = dashboardDestinationFilter === 'ALL' 
@@ -498,7 +504,7 @@ export default function App() {
 
       {/* Main Container */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar com a Ordem Exata Solicitada */}
         {sidebarOpen && (
           <aside className="w-64 bg-slate-900/90 border-r border-slate-800 p-4 flex flex-col space-y-2 transition-all duration-300">
             <button 
@@ -516,15 +522,6 @@ export default function App() {
               <Database className="w-4 h-4" />
               <span>Painel de Voos</span>
             </button>
-
-            {/* Nova Opção Desembarque */}
-            <button 
-              onClick={() => setActiveTab('debark')}
-              className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'debark' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
-            >
-              <UserCheck2 className="w-4 h-4" />
-              <span>Desembarque</span>
-            </button>
             
             <button 
               onClick={() => { setEditingId(null); setActiveTab('new'); }}
@@ -532,6 +529,14 @@ export default function App() {
             >
               <PlusCircle className="w-4 h-4" />
               <span>Adicionar Voo</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('debark')}
+              className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all ${activeTab === 'debark' ? 'bg-sky-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              <UserCheck2 className="w-4 h-4" />
+              <span>Desembarque</span>
             </button>
 
             <button 
@@ -580,15 +585,15 @@ export default function App() {
               </button>
               <button onClick={() => setActiveTab('dashboard')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'dashboard' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Dashboard</button>
               <button onClick={() => setActiveTab('panel')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'panel' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Painel</button>
+              <button onClick={() => { setEditingId(null); setActiveTab('new'); }} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'new' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Adicionar Voo</button>
               <button onClick={() => setActiveTab('debark')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'debark' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Desembarque</button>
-              <button onClick={() => { setEditingId(null); setActiveTab('new'); }} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'new' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Adicionar</button>
               <button onClick={() => setActiveTab('aircrafts')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'aircrafts' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Aeronaves</button>
               <button onClick={() => setActiveTab('report')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'report' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Relatório</button>
               <button onClick={() => setActiveTab('users')} className={`px-3 py-1.5 rounded text-xs font-bold ${activeTab === 'users' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-300'}`}>Utilizadores</button>
             </div>
           )}
 
-          {/* BARRA DE FILTROS GERAIS */}
+          {/* BARRA DE FILTROS GERAIS (COMPARTILHADA NO TOPO) */}
           {(activeTab === 'dashboard' || activeTab === 'panel') && (
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow space-y-4">
               <div className="flex items-center space-x-2 text-sky-400 text-xs font-bold tracking-wider">
@@ -652,7 +657,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* FILTROS EXCLUSIVOS DO DASHBOARD (LOCALIDADE E DESEMBARQUE) */}
+              {/* FILTROS ADICIONAIS DO DASHBOARD */}
               {activeTab === 'dashboard' && (
                 <div className="pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col space-y-1">
@@ -690,9 +695,72 @@ export default function App() {
             </div>
           )}
 
-          {/* DASHBOARD */}
+          {/* DASHBOARD COM O NOVO PERFIL DE ESTATÍSTICA */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
+              
+              {/* BLOCO DE ESTATÍSTICA SOLICITADO */}
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-sky-600 p-2.5 rounded-xl text-white shadow-lg shadow-sky-900/50">
+                    <PieChart className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-extrabold text-white tracking-wider">PERFIL ESTATÍSTICA OPERACIONAL</h2>
+                    <p className="text-[11px] text-slate-400 font-sans normal-case">Gere a visão consolidada por tipo de aeronave aplicando os filtros de data acima</p>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowStatsReport(!showStatsReport)}
+                  className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-5 py-2.5 rounded-xl transition-colors tracking-wider text-xs shadow-md flex items-center space-x-2 w-full sm:w-auto justify-center"
+                >
+                  <PieChart className="w-4 h-4" />
+                  <span>{showStatsReport ? 'OCULTAR ESTATÍSTICAS' : 'GERAR ESTATÍSTICA'}</span>
+                </button>
+              </div>
+
+              {/* EXIBIÇÃO EM BLOCOS/QUADRADINHOS SEPARADOS POR TIPO DE AERONAVE */}
+              {showStatsReport && (
+                <div className="bg-slate-900 border border-sky-900/50 p-6 rounded-2xl shadow-2xl space-y-6">
+                  <div className="border-b border-slate-800 pb-3 flex justify-between items-center">
+                    <h3 className="text-xs font-bold text-sky-400 tracking-wider">RELATÓRIO ESTATÍSTICO POR TIPO DE AERONAVE</h3>
+                    <span className="text-xs text-slate-400 font-mono">SELEÇÃO ATUAL: {filteredFlights.length} VOOS PROCESSADOS</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {statsByAircraft.length === 0 ? (
+                      <p className="text-xs text-slate-500 col-span-full text-center py-6">Nenhum registo de voo encontrado para os filtros selecionados.</p>
+                    ) : (
+                      statsByAircraft.map((stat, idx) => (
+                        <div key={idx} className="bg-slate-950 border border-slate-800 p-5 rounded-xl shadow-inner space-y-4 flex flex-col justify-between">
+                          <div className="flex justify-between items-start border-b border-slate-800/80 pb-2">
+                            <span className="text-xs font-bold text-white font-mono">{stat.aircraft}</span>
+                            <span className="bg-sky-950/80 text-sky-400 px-2 py-0.5 rounded text-[10px] font-mono font-bold">FROTA FAB</span>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 text-center font-mono">
+                            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                              <span className="text-[10px] text-slate-400 block">VOOS</span>
+                              <span className="text-base font-black text-sky-400">{stat.flightsCount}</span>
+                            </div>
+                            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                              <span className="text-[10px] text-slate-400 block">PAX TRANS.</span>
+                              <span className="text-base font-black text-emerald-400">{stat.totalPax}</span>
+                            </div>
+                            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                              <span className="text-[10px] text-slate-400 block">DESEMB.</span>
+                              <span className="text-base font-black text-cyan-400">{stat.totalDebark}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* GRÁFICOS E CARTÕES GERAIS DO DASHBOARD */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
                 {/* 1. Total de Voos */}
@@ -733,7 +801,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 3. Total de Desembarques (NOVO) */}
+                {/* 3. Total de Desembarques */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                     <span className="text-xs font-extrabold text-slate-400 tracking-wider">TOTAL DESEMBARCADOS</span>
@@ -809,7 +877,7 @@ export default function App() {
             </div>
           )}
 
-          {/* NOVA ABA DESEMBARQUE MÚLTIPLO */}
+          {/* ABA DESEMBARQUE MÚLTIPLO */}
           {activeTab === 'debark' && (
             <div className="space-y-6 max-w-4xl mx-auto">
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
@@ -817,7 +885,7 @@ export default function App() {
                   <UserCheck2 className="w-4 h-4 mr-2 text-sky-400" /> GESTÃO E FILTRO DE DESEMBARQUE — MÚLTIPLOS VOOS
                 </h2>
                 <p className="text-xs text-slate-400 font-sans normal-case">
-                  Filtre por data e aeronave (ex: C-97, C-98, KC-390), selecione múltiplos voos e indique o total de passageiros desembarcados de uma só vez.
+                  Filtre por data e aeronave, selecione múltiplos voos e indique o total de passageiros desembarcados de uma só vez.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 text-xs">
@@ -847,7 +915,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Lista de Voos Filtrados para Atribuição de Desembarque */}
               <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
                 <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                   <span className="text-xs font-bold text-sky-400 tracking-wider">VOOS ENCONTRADOS PARA DESEMBARQUE ({debarkTabFilteredFlights.length})</span>
@@ -1010,7 +1077,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Informação de Desembarque e Dia da Semana */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {weekdayName && (
                           <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">

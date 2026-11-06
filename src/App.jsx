@@ -22,7 +22,8 @@ import {
   LogOut,
   UserCheck,
   Key,
-  MapPin
+  MapPin,
+  Calendar
 } from 'lucide-react';
 
 export default function App() {
@@ -50,12 +51,15 @@ export default function App() {
 
   const [newAircraftInput, setNewAircraftInput] = useState('');
 
-  // Estados dos Filtros
+  // Estados dos Filtros Gerais
   const [filterAircraft, setFilterAircraft] = useState('ALL');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterMonthYear, setFilterMonthYear] = useState('');
+
+  // Novo Filtro Específico do Dashboard por Localidade/Destino
+  const [dashboardDestinationFilter, setDashboardDestinationFilter] = useState('ALL');
 
   // Filtros de Relatório
   const [reportAircraft, setReportAircraft] = useState('ALL');
@@ -142,15 +146,29 @@ export default function App() {
     return `${Math.round(ratio)}%`;
   };
 
-  // Regra ajustada: Só exibe múltiplos destinos se houver 3 ou mais aeródromos na rota (ex: A-B-C)
+  // Função para calcular o dia da semana por extenso em português
+  const getWeekdayName = (dateStr) => {
+    if (!dateStr) return '';
+    // Adiciona T12:00:00 para evitar desvios de fuso horário UTC na conversão da data
+    const dateObj = new Date(dateStr + 'T12:00:00');
+    if (isNaN(dateObj.getTime())) return '';
+    const weekdays = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
+    return weekdays[dateObj.getDay()];
+  };
+
   const getRouteDestinations = (routeStr) => {
     if (!routeStr) return [];
     const parts = routeStr.split('-').map(p => p.trim().toUpperCase()).filter(Boolean);
-    if (parts.length < 3) return []; // Requer pelo menos 3 aeródromos
+    if (parts.length < 3) return [];
     return parts.slice(1);
   };
 
   const currentDestinations = getRouteDestinations(newFlight.route);
+
+  // Recolher todas as localidades/destinos únicos já registados no sistema para popular o filtro do dashboard
+  const allAvailableDestinations = Array.from(new Set(
+    flightList.flatMap(f => Object.keys(f.destinationsData || {}))
+  ));
 
   const cleanNameOnly = (line) => {
     let upper = line.trim().toUpperCase();
@@ -280,7 +298,12 @@ export default function App() {
     const matchEndDate = !filterEndDate || flight.date <= filterEndDate;
     const matchDate = !filterDate || flight.date === filterDate;
     const matchMonthYear = !filterMonthYear || flight.date.startsWith(filterMonthYear);
-    return matchAircraft && matchStartDate && matchEndDate && matchDate && matchMonthYear;
+    
+    // Filtro por Destino no Dashboard
+    const matchDestination = dashboardDestinationFilter === 'ALL' || 
+      (flight.destinationsData && flight.destinationsData[dashboardDestinationFilter] && Number(flight.destinationsData[dashboardDestinationFilter].pax) > 0);
+
+    return matchAircraft && matchStartDate && matchEndDate && matchDate && matchMonthYear && matchDestination;
   });
 
   const reportFilteredFlights = flightList.filter(flight => {
@@ -291,8 +314,14 @@ export default function App() {
     return matchAircraft && matchStartDate && matchEndDate && matchSpecific;
   });
 
+  // Métricas do Dashboard considerando o filtro por localidade
   const totalFlightsCount = filteredFlights.length;
-  const totalPaxAll = filteredFlights.reduce((acc, f) => acc + (f.paxTotal || f.originalList.length || 0), 0);
+  
+  // Se houver um filtro de destino ativo, calcula o total de PAX direcionado especificamente para essa localidade
+  const totalPaxAll = dashboardDestinationFilter === 'ALL' 
+    ? filteredFlights.reduce((acc, f) => acc + (f.paxTotal || f.originalList.length || 0), 0)
+    : filteredFlights.reduce((acc, f) => acc + (Number(f.destinationsData[dashboardDestinationFilter]?.pax) || 0), 0);
+
   const totalPaxWeightAll = filteredFlights.reduce((acc, f) => acc + f.paxWeight, 0);
   const totalBagWeightAll = filteredFlights.reduce((acc, f) => acc + f.bagWeight, 0);
   const totalWeightAll = filteredFlights.reduce((acc, f) => acc + f.totalWeight, 0);
@@ -565,12 +594,39 @@ export default function App() {
                   />
                 </div>
               </div>
+
+              {/* FILTRO ESPECÍFICO DE LOCALIDADE / DESTINO (APENAS NO DASHBOARD) */}
+              {activeTab === 'dashboard' && (
+                <div className="pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center space-x-2 text-emerald-400 font-mono text-xs">
+                    <MapPin className="w-4 h-4" />
+                    <span>FILTRAR PAX POR LOCALIDADE / DESTINO:</span>
+                  </div>
+                  <select 
+                    value={dashboardDestinationFilter}
+                    onChange={(e) => setDashboardDestinationFilter(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-white uppercase font-mono text-xs w-full sm:w-64"
+                  >
+                    <option value="ALL">TODAS AS LOCALIDADES (GERAL)</option>
+                    {allAvailableDestinations.map((dest, idx) => (
+                      <option key={idx} value={dest}>DESTINO: {dest}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 
           {/* DASHBOARD */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
+              {dashboardDestinationFilter !== 'ALL' && (
+                <div className="bg-emerald-950/40 border border-emerald-800/60 p-4 rounded-xl flex items-center justify-between text-xs font-mono text-emerald-300">
+                  <span>🎯 A FILTRAR PASSAGEIROS PARA O DESTINO: <strong className="text-white text-sm">{dashboardDestinationFilter}</strong></span>
+                  <button onClick={() => setDashboardDestinationFilter('ALL')} className="underline hover:text-white">LIMPAR FILTRO DE DESTINO</button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
                 {/* 1. Total de Voos */}
@@ -591,10 +647,12 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* 2. Total de Passageiros (PAX) */}
+                {/* 2. Total de Passageiros (PAX) com suporte ao filtro de localidade */}
                 <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-5 flex flex-col justify-between">
                   <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                    <span className="text-xs font-extrabold text-slate-400 tracking-wider">TOTAL DE PASSAGEIROS (PAX)</span>
+                    <span className="text-xs font-extrabold text-slate-400 tracking-wider">
+                      {dashboardDestinationFilter === 'ALL' ? 'TOTAL DE PASSAGEIROS (PAX)' : `PAX PARA ${dashboardDestinationFilter}`}
+                    </span>
                     <span className="text-2xl font-black text-emerald-400 font-mono">{totalPaxAll}</span>
                   </div>
                   <div className="h-40 bg-slate-950/90 rounded-xl border border-slate-800/80 p-4 flex items-end justify-center relative overflow-hidden shadow-inner">
@@ -667,7 +725,7 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS COM DESTINOS MÚLTIPLOS (EXIBINDO APENAS PAX POR DESTINO) */}
+          {/* PAINEL DE VOOS COM O DIA DA SEMANA ABAIXO DA QUANTIDADE DE BAGAGENS */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
@@ -678,6 +736,7 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredFlights.map((f) => {
                   const effectiveness = calculateEffectiveness(f);
+                  const weekdayName = getWeekdayName(f.date);
                   return (
                     <div key={f.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4 relative hover:border-sky-500/50 transition-all">
                       <div className="flex justify-between items-start border-b border-slate-800 pb-3">
@@ -748,6 +807,14 @@ export default function App() {
                           <span className="text-slate-300 font-mono text-[11px]">EFETIVIDADE: <strong className="text-emerald-400">{effectiveness}</strong></span>
                         </div>
                       </div>
+
+                      {/* Dia da semana exibido exatamente abaixo da quantidade de bagagens */}
+                      {weekdayName && (
+                        <div className="flex items-center space-x-2 text-[11px] text-sky-400 font-mono bg-sky-950/30 border border-sky-900/40 px-3 py-1.5 rounded-lg">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>DIA DA SEMANA: <strong className="text-white">{weekdayName}</strong></span>
+                        </div>
+                      )}
 
                       <div className="flex justify-end items-center pt-2 border-t border-slate-800/50 text-xs space-x-3 font-mono">
                         <button onClick={() => handleEditFlight(f)} className="text-sky-400 hover:text-sky-300 flex items-center space-x-1">
@@ -845,7 +912,7 @@ export default function App() {
                   <table className="w-full text-left border-collapse text-xs font-mono">
                     <thead>
                       <tr className="bg-slate-900 text-white border-b border-slate-800">
-                        <th className="p-2.5">DATA</th>
+                        <th className="p-2.5">DATA / DIA</th>
                         <th className="p-2.5">AERONAVE / MATR.</th>
                         <th className="p-2.5">ROTA / DESTINOS</th>
                         <th className="p-2.5 text-center">CHAMADA</th>
@@ -863,7 +930,10 @@ export default function App() {
                       ) : (
                         reportFilteredFlights.map((f) => (
                           <tr key={f.id} className="hover:bg-slate-50">
-                            <td className="p-2.5">{f.date}</td>
+                            <td className="p-2.5">
+                              {f.date}
+                              <span className="block text-[10px] text-slate-500 font-bold">{getWeekdayName(f.date)}</span>
+                            </td>
                             <td className="p-2.5 font-bold">{f.aircraft} {f.matricula ? `(${f.matricula})` : ''}</td>
                             <td className="p-2.5">
                               {f.route}
@@ -1025,7 +1095,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR / EDITAR VOO COM DESTINOS MÚLTIPLOS A PARTIR DA 3ª ROTA (APENAS PAX) */}
+          {/* ADICIONAR / EDITAR VOO */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
@@ -1170,7 +1240,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* CAIXAS DINÂMICAS PARA DESTINOS MÚLTIPLOS (APENAS PAX A PARTIR DA 3ª ROTA) */}
                 {currentDestinations.length > 0 && (
                   <div className="bg-slate-950 p-4 rounded-xl border border-sky-900/40 space-y-3">
                     <span className="text-xs font-bold text-sky-400 flex items-center">

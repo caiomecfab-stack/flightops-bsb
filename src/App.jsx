@@ -55,8 +55,8 @@ export default function App() {
       bagWeight: 240,
       totalWeight: 1200,
       bagCount: 14,
-      originalList: ['JOAO SILVA', 'MARIA OLIVEIRA', 'CARLOS SOUZA'],
-      embarkedList: ['JOAO SILVA', 'MARIA OLIVEIRA']
+      originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
+      embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA']
     }
   ]);
 
@@ -87,13 +87,18 @@ export default function App() {
     return clean;
   };
 
+  // Processamento exato das linhas mantendo o nome completo estrito
   const formOriginalList = newFlight.originalText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
   const formEmbarkedList = newFlight.embarkedText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
+  
   const formTotalPrev = Number(newFlight.paxTotal) || formOriginalList.length;
-  const formTotalEmb = formEmbarkedList.length;
-  const formFaltas = Math.max(0, formTotalPrev - formTotalEmb);
-  const formExtras = Math.max(0, formTotalEmb - formTotalPrev);
-  const formPercFaltas = formTotalPrev > 0 ? ((formFaltas / formTotalPrev) * 100).toFixed(1) : '0.0';
+  
+  // Triangulação rigorosa por correspondência exata do nome completo
+  const embarkedMatchedCount = formOriginalList.filter(origName => formEmbarkedList.includes(origName)).length;
+  const formFaltas = Math.max(0, formOriginalList.length - embarkedMatchedCount);
+  const extraNamesCount = formEmbarkedList.filter(embName => !formOriginalList.includes(embName)).length;
+  const formExtras = extraNamesCount;
+  const formPercFaltas = formOriginalList.length > 0 ? ((formFaltas / formOriginalList.length) * 100).toFixed(1) : '0.0';
 
   const handleAddAircraft = (e) => {
     e.preventDefault();
@@ -220,14 +225,14 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-wider text-white">FLIGHTOPS <span className="text-sky-400">BSB</span></h1>
-            <p className="text-xs text-slate-400">Posto PR — Base Aérea de Brasília (SBBR)</p>
+            <p className="text-xs text-slate-400">POSTO CAN BR — Base Aérea de Brasília (SBBR)</p>
           </div>
         </div>
         
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs text-emerald-400">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span className="font-medium">Posto PR Operacional</span>
+            <span className="font-medium">POSTO CAN BR Operacional</span>
           </div>
         </div>
       </header>
@@ -300,7 +305,7 @@ export default function App() {
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow space-y-4">
             <div className="flex items-center space-x-2 text-sky-400 text-xs font-bold tracking-wider">
               <Filter className="w-4 h-4" />
-              <span>Filtros Operacionais — Posto PR</span>
+              <span>Filtros Operacionais — POSTO CAN BR</span>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
@@ -434,11 +439,11 @@ export default function App() {
             </div>
           )}
 
-          {/* PAINEL DE VOOS EM FORMATO DE CAIXAS COM OPÇÃO DE EDITAR E APAGAR */}
+          {/* PAINEL DE VOOS EM FORMATO DE CAIXAS */}
           {activeTab === 'panel' && (
             <div className="space-y-4">
               <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex justify-between items-center shadow-lg">
-                <h2 className="text-xs font-bold text-white tracking-wider">PAINEL DE REGISTO DE VOOS — POSTO PR</h2>
+                <h2 className="text-xs font-bold text-white tracking-wider">PAINEL DE REGISTO DE VOOS — POSTO CAN BR</h2>
                 <span className="text-xs text-slate-400 font-mono">{filteredFlights.length} REGISTOS</span>
               </div>
 
@@ -507,7 +512,7 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR AERONAVE COM OPÇÃO DE EXCLUIR */}
+          {/* ADICIONAR AERONAVE */}
           {activeTab === 'aircrafts' && (
             <div className="max-w-xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
@@ -553,11 +558,11 @@ export default function App() {
             </div>
           )}
 
-          {/* ADICIONAR / EDITAR VOO (COM CAMPO TOTAL DE PAX INCLUÍDO) */}
+          {/* ADICIONAR / EDITAR VOO */}
           {activeTab === 'new' && (
             <div className="max-w-4xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-6">
               <h2 className="text-xs font-bold text-white flex items-center tracking-wider">
-                <PlusCircle className="w-4 h-4 mr-2 text-sky-400" /> {editingId ? 'EDITAR VOO' : 'ADICIONAR VOO'} — POSTO PR
+                <PlusCircle className="w-4 h-4 mr-2 text-sky-400" /> {editingId ? 'EDITAR VOO' : 'ADICIONAR VOO'} — POSTO CAN BR
               </h2>
               
               <form onSubmit={handleAddFlight} className="space-y-6 text-xs font-sans">
@@ -642,7 +647,6 @@ export default function App() {
                     />
                   </div>
 
-                  {/* CAMPO TOTAL DE PASSAGEIROS ADICIONADO */}
                   <div>
                     <label className="block text-slate-400 mb-1">TOTAL DE PASSAGEIROS (PAX)</label>
                     <input 
@@ -705,9 +709,10 @@ export default function App() {
                     <label className="block text-slate-300 font-semibold flex items-center uppercase">
                       <FileSpreadsheet className="w-4 h-4 mr-1 text-sky-400" /> 1. COPIAR & COLAR RELAÇÃO PRINCIPAL
                     </label>
+                    <p className="text-[10px] text-slate-400 font-sans normal-case">Insira o nome completo exato por linha (ex: 2S JOAO DA SILVA)</p>
                     <textarea 
                       rows="5"
-                      placeholder="JOÃO DA SILVA&#10;MARIA OLIVEIRA&#10;CARLOS SOUZA"
+                      placeholder="2S JOAO DA SILVA&#10;SGT MARIA OLIVEIRA&#10;CEL CARLOS SOUZA"
                       value={newFlight.originalText}
                       onChange={(e) => setNewFlight({ ...newFlight, originalText: e.target.value.toUpperCase() })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white font-mono text-xs uppercase"
@@ -718,9 +723,10 @@ export default function App() {
                     <label className="block text-slate-300 font-semibold flex items-center uppercase">
                       <Users className="w-4 h-4 mr-1 text-emerald-400" /> 2. COPIAR & COLAR EFETIVAMENTE EMBARCADOS
                     </label>
+                    <p className="text-[10px] text-slate-400 font-sans normal-case">O nome completo deve coincidir rigorosamente para contar como presente</p>
                     <textarea 
                       rows="5"
-                      placeholder="JOÃO DA SILVA&#10;MARIA OLIVEIRA&#10;NOVO PASSAGEIRO"
+                      placeholder="2S JOAO DA SILVA&#10;SGT MARIA OLIVEIRA&#10;NOVO PASSAGEIRO"
                       value={newFlight.embarkedText}
                       onChange={(e) => setNewFlight({ ...newFlight, embarkedText: e.target.value.toUpperCase() })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white font-mono text-xs uppercase"
@@ -728,15 +734,15 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* RELATÓRIO DINÂMICO DE PASSAGEIROS */}
+                {/* RELATÓRIO DINÂMICO DE PASSAGEIROS COM VALIDAÇÃO RIGOROSA DE NOME COMPLETO */}
                 <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl grid grid-cols-2 sm:grid-cols-5 gap-3 text-center font-mono">
                   <div>
                     <span className="text-[10px] text-slate-400 block">TOTAL PREVISTO</span>
                     <span className="text-base font-bold text-white">{formTotalPrev}</span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block">EMBARCADOS</span>
-                    <span className="text-base font-bold text-sky-400">{formTotalEmb}</span>
+                    <span className="text-[10px] text-slate-400 block">EMBARCADOS (EXATOS)</span>
+                    <span className="text-base font-bold text-sky-400">{embarkedMatchedCount}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-400 block">FALTAS</span>
@@ -753,7 +759,7 @@ export default function App() {
                 </div>
 
                 <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors mt-4 tracking-wider">
-                  {editingId ? 'ATUALIZAR VOO NO POSTO PR' : 'SALVAR VOO E GERAR RELATÓRIO DO POSTO PR'}
+                  {editingId ? 'ATUALIZAR VOO NO POSTO CAN BR' : 'SALVAR VOO E GERAR RELATÓRIO DO POSTO CAN BR'}
                 </button>
               </form>
             </div>

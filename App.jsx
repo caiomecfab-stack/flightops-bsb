@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import {
   Users, Search, Filter, Calendar, BarChart3, Plane, Briefcase,
   Trash2, Edit2, AlertCircle, Sun, Moon, Scale, PlusCircle,
   Check, UserCheck, UserX, UserPlus, Clock, Activity
@@ -9,13 +10,15 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   
   // Lista de Voos Cadastrados Manualmente
-const [voos, setVoos] = useState(() => {
-  const salvo = localStorage.getItem('flightops_voos');
-  return salvo ? JSON.parse(salvo) : [];
-});
- useEffect(() => {
-  localStorage.setItem('flightops_voos', JSON.stringify(voos));
-}, [voos]);
+  const [voos, setVoos] = useState(() => {
+    const salvo = localStorage.getItem('flightops_voos');
+    return salvo ? JSON.parse(salvo) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('flightops_voos', JSON.stringify(voos));
+  }, [voos]);
+
   const [editandoId, setEditandoId] = useState(null);
 
   // Frota Oficial da Força Aérea Brasileira (FAB) customizável
@@ -289,15 +292,6 @@ const [voos, setVoos] = useState(() => {
     setVoos(prev => prev.filter(v => v.id !== id));
   };
 
-  const aplicarFiltros = () => {
-    setFiltrosAplicados({
-      projeto: filtroProjetoTemp,
-      data: filtroDataTemp,
-      mes: filtroMesTemp,
-      ano: filtroAnoTemp
-    });
-  };
-
   const limparFiltros = () => {
     setFiltroProjetoTemp('todos');
     setFiltroDataTemp('');
@@ -399,7 +393,7 @@ const [voos, setVoos] = useState(() => {
   return (
     <div className={`min-h-screen flex font-sans relative overflow-hidden ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       
-      {/* FUNDO COM IMAGEM REAL DE AERONAVE EM VOO (FOTO HD COM PANORAMA E SOBREPOSIÇÃO) */}
+      {/* FUNDO COM IMAGEM REAL DE AERONAVE EM VOO */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <style>{`
           @keyframes slowPan {
@@ -412,13 +406,11 @@ const [voos, setVoos] = useState(() => {
           }
         `}</style>
         
-        {/* Imagem Fotográfica Real de Aeronave Militar em Voo com Movimento Lento */}
         <div 
           className="absolute inset-0 bg-cover bg-center opacity-25 animate-real-plane filter contrast-125"
           style={{ backgroundImage: `url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=2000&q=80')` }}
         ></div>
 
-        {/* Gradiente Escuro para Garantir Contraste Perfeito */}
         <div className={`absolute inset-0 ${darkMode ? 'bg-gradient-to-br from-slate-950/95 via-slate-900/90 to-slate-950/95' : 'bg-gradient-to-br from-slate-100/90 via-white/85 to-slate-200/90'}`}></div>
       </div>
 
@@ -707,18 +699,15 @@ const [voos, setVoos] = useState(() => {
                                   <span className="text-blue-400 font-bold">Taxa de Faltas: {v.manifestoComparativo.taxaFalta}%</span>
                                 </div>
                               </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
-                                {v.manifestoComparativo.comparativo.map((c, idxC) => (
-                                  <div key={idxC} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-[11px]">
-                                    <span className="font-medium truncate mr-2">{c.nome}</span>
-                                    <span className={`px-2 py-0.5 rounded font-extrabold text-[9px] ${
-                                      c.status === 'PRESENTE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                                      c.status === 'FALTOU' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                                      'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                    }`}>
-                                      {c.status}
-                                    </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {v.manifestoComparativo.comparativo.map((c, idx) => (
+                                  <div key={idx} className={`p-2 rounded-lg border text-[11px] flex items-center justify-between ${
+                                    c.status === 'PRESENTE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' :
+                                    c.status === 'FALTOU' ? 'bg-rose-500/10 border-rose-500/20 text-rose-300' :
+                                    'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                                  }`}>
+                                    <span>{c.nome}</span>
+                                    <span className="font-extrabold text-[10px]">{c.status}</span>
                                   </div>
                                 ))}
                               </div>
@@ -728,139 +717,83 @@ const [voos, setVoos] = useState(() => {
                       ))}
                     </div>
                   </div>
-
-                  {/* GRÁFICO DE BARRAS VERTICAL NO RODAPÉ */}
-                  <div className={`p-6 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} space-y-4 shadow-xl`}>
-                    <h3 className="text-sm font-extrabold flex items-center text-blue-400">
-                      <BarChart3 className="w-4 h-4 mr-2" /> Gráfico Comparativo Geral de Cômputo (Barras Verticais)
-                    </h3>
-                    <p className="text-xs text-slate-400">Comparação visual de passageiros e peso total por voo filtrado.</p>
-
-                    <div className="pt-6 pb-2 flex items-end justify-around gap-4 h-64 border-b border-slate-800 overflow-x-auto">
-                      {voosFiltrados.map((v, idx) => {
-                        const maxP = Math.max(...voosFiltrados.map(item => Math.max(item.totalPax, item.totalPeso / 50)), 1);
-                        const hPax = Math.max(Math.round((v.totalPax / maxP) * 160), 20);
-                        const hPeso = Math.max(Math.round(((v.totalPeso / 50) / maxP) * 160), 20);
-
-                        return (
-                          <div key={v.id || idx} className="flex flex-col items-center h-full justify-end flex-1 min-w-[70px] group">
-                            <div className="flex items-end justify-center space-x-1.5 w-full h-44 pb-2">
-                              <div
-                                className="w-6 bg-blue-500 rounded-t-lg transition-all duration-300 group-hover:bg-blue-400 relative flex items-start justify-center pt-1"
-                                style={{ height: `${hPax}px` }}
-                                title={`Pax: ${v.totalPax}`}
-                              >
-                                <span className="text-[9px] font-bold text-white -rotate-90 origin-bottom mt-1">{v.totalPax}p</span>
-                              </div>
-                              <div
-                                className="w-6 bg-emerald-500 rounded-t-lg transition-all duration-300 group-hover:bg-emerald-400 relative flex items-start justify-center pt-1"
-                                style={{ height: `${hPeso}px` }}
-                                title={`Peso Total: ${v.totalPeso} kg`}
-                              >
-                                <span className="text-[9px] font-bold text-white -rotate-90 origin-bottom mt-1">{v.totalPeso}kg</span>
-                              </div>
-                            </div>
-                            <div className="text-center mt-2 border-t border-slate-800 pt-1 w-full">
-                              <span className="text-[11px] font-extrabold text-blue-400 block truncate">{v.projeto}</span>
-                              <span className="text-[9px] text-slate-400 block truncate">{v.dataVoo}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center justify-center space-x-6 text-xs pt-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-3 h-3 rounded bg-blue-500 inline-block"></span>
-                        <span className="text-slate-300 font-semibold">Total de Passageiros (PAX)</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="w-3 h-3 rounded bg-emerald-500 inline-block"></span>
-                        <span className="text-slate-300 font-semibold">Peso Total (kg) / Escala</span>
-                      </div>
-                    </div>
-                  </div>
-
                 </div>
               )}
-
             </div>
           )}
 
           {/* ========================================== */}
-          {/* ABA 2: CADASTRAR OU EDITAR VOO MANUALMENTE */}
+          {/* ABA 2: CADASTRAR / EDITAR VOO MANUAL */}
           {/* ========================================== */}
           {activeTab === 'registro' && (
-            <div className="max-w-2xl mx-auto space-y-6">
-              
-              <form onSubmit={handleSubmitVoo} className={`p-8 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} shadow-xl space-y-5`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-extrabold flex items-center text-blue-400">
-                      <PlusCircle className="w-5 h-5 mr-2" /> {editandoId ? 'Editar Voo Cadastrado' : 'Inserção Manual de Voo e Carga'}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">Preencha os horários (com minutos livres ex: 10:34) e calcule a eficiência operacional.</p>
-                  </div>
-                  {editandoId && (
-                    <button
-                      type="button"
-                      onClick={() => { setEditandoId(null); setActiveTab('dashboard'); }}
-                      className="text-xs text-rose-400 underline font-bold"
-                    >
-                      Cancelar
-                    </button>
-                  )}
-                </div>
+            <div className={`p-8 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} space-y-6 shadow-xl`}>
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <h3 className="text-sm font-extrabold flex items-center text-blue-400">
+                  <PlusCircle className="w-4 h-4 mr-2" /> {editandoId ? 'Editar Registro de Voo' : 'Cadastrar Novo Voo e Carga Manual'}
+                </h3>
+                {editandoId && (
+                  <button
+                    onClick={() => {
+                      setEditandoId(null);
+                      setActiveTab('dashboard');
+                    }}
+                    className="text-xs text-rose-400 hover:underline font-bold"
+                  >
+                    Cancelar Edição
+                  </button>
+                )}
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <form onSubmit={handleSubmitVoo} className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Projeto / Identificador (Ex: C-95, C-97, C-99)</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Projeto / Missão</label>
                     <input
                       type="text"
                       name="projeto"
                       value={formData.projeto}
                       onChange={handleInputChange}
-                      required
-                      placeholder="Ex: C-99"
+                      placeholder="Ex: C-99, SALVAERO, OP AMAZONIA"
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
+                      required
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-400 mb-1">Modelo da Aeronave (FAB)</label>
                     <select
-                      name="modeloAeronave"
                       value={formData.modeloAeronave}
                       onChange={handleModeloChange}
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     >
                       {frotaAeronaves.map(a => (
-                        <option key={a.modelo} value={a.modelo}>{a.modelo}</option>
+                        <option key={a.id} value={a.modelo}>{a.modelo}</option>
                       ))}
                     </select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Matrícula (Opcional)</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Matrícula</label>
                     <input
                       type="text"
                       name="matricula"
                       value={formData.matricula}
                       onChange={handleInputChange}
-                      placeholder="Ex: FAB 2591"
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
+                      required
                     />
                   </div>
+                </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Rota (Ex: SBBR - SBGL)</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Rota</label>
                     <input
                       type="text"
                       name="rota"
                       value={formData.rota}
                       onChange={handleInputChange}
-                      required
+                      placeholder="SBBR - SBGL"
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
@@ -872,71 +805,64 @@ const [voos, setVoos] = useState(() => {
                       name="dataVoo"
                       value={formData.dataVoo}
                       onChange={handleInputChange}
-                      required
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
+                      required
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Hora Chamada (Previsto)</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Horário de Chamada</label>
                     <input
                       type="time"
                       name="horarioChamada"
                       value={formData.horarioChamada}
                       onChange={handleInputChange}
-                      required
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Hora Decolagem</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Horário Decolagem</label>
                     <input
                       type="time"
                       name="horarioDecolagem"
                       value={formData.horarioDecolagem}
                       onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Hora Embarque Real (Execução)</label>
-                    <input
-                      type="time"
-                      name="horarioEmbarqueReal"
-                      value={formData.horarioEmbarqueReal}
-                      onChange={handleInputChange}
-                      required
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Total de PAX</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Embarque Real</label>
                     <input
-                      type="number"
-                      name="totalPax"
-                      value={formData.totalPax}
+                      type="time"
+                      name="horarioEmbarqueReal"
+                      value={formData.horarioEmbarqueReal}
                       onChange={handleInputChange}
-                      required
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Peso Pax (kg)</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Total PAX</label>
+                    <input
+                      type="number"
+                      name="totalPax"
+                      value={formData.totalPax}
+                      onChange={handleInputChange}
+                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Peso PAX (kg)</label>
                     <input
                       type="number"
                       name="pesoPax"
                       value={formData.pesoPax}
                       onChange={handleInputChange}
-                      required
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
@@ -948,187 +874,126 @@ const [voos, setVoos] = useState(() => {
                       name="pesoBagagem"
                       value={formData.pesoBagagem}
                       onChange={handleInputChange}
-                      required
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Total de Peso (kg)</label>
-                    <input
-                      type="number"
-                      name="totalPeso"
-                      value={formData.totalPeso}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Qtd Bagagens</label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Qtd Bagagens (vol.)</label>
                     <input
                       type="number"
                       name="qtyBagagem"
                       value={formData.qtyBagagem}
                       onChange={handleInputChange}
-                      required
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     />
                   </div>
                 </div>
 
-                {/* COPIAR E COLAR LISTAS DE NOMES PARA COMPARATIVO */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1 flex items-center">
-                      <Users className="w-3.5 h-3.5 mr-1 text-blue-400" /> 1ª Relação (Manifesto Previsto)
-                    </label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Lista Prevista (Um nome por linha)</label>
                     <textarea
                       name="textoListaPrevista"
-                      rows="5"
                       value={formData.textoListaPrevista}
                       onChange={handleInputChange}
-                      placeholder="Cole aqui os nomes da primeira relação (um por linha)..."
+                      rows={5}
+                      placeholder="Cap Silva&#10;Ten João&#10;Sgt Maria"
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     ></textarea>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1 flex items-center">
-                      <UserCheck className="w-3.5 h-3.5 mr-1 text-emerald-400" /> 2ª Relação (Realizado de Embarque)
-                    </label>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Lista Realizada (Um nome por linha)</label>
                     <textarea
                       name="textoListaRealizada"
-                      rows="5"
                       value={formData.textoListaRealizada}
                       onChange={handleInputChange}
-                      placeholder="Cole aqui os nomes reais que embarcaram (um por linha)..."
+                      rows={5}
+                      placeholder="Cap Silva&#10;Sgt Maria&#10;Sub Carlos (Pax Novo)"
                       className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
                     ></textarea>
                   </div>
                 </div>
 
-                {/* PAINEL DE RESULTADO COMPARATIVO E EFICIÊNCIA */}
-                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-extrabold text-blue-400 uppercase tracking-wider">Eficiência Operacional & Comparativo</h4>
-                    <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 font-extrabold text-xs border border-cyan-500/20">
-                      Índice: {calcularEficiencia(formData.horarioChamada, formData.horarioEmbarqueReal || formData.horarioDecolagem)}%
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                    <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                      <span className="text-xs text-slate-400 block">Presentes</span>
-                      <span className="text-sm font-extrabold text-emerald-400">{comparativoManifesto.presentes}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20">
-                      <span className="text-xs text-slate-400 block">Faltaram</span>
-                      <span className="text-sm font-extrabold text-rose-400">{comparativoManifesto.faltaram}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                      <span className="text-xs text-slate-400 block">Pax Novos</span>
-                      <span className="text-sm font-extrabold text-amber-400">{comparativoManifesto.novos}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                      <span className="text-xs text-slate-400 block">% de Faltas</span>
-                      <span className="text-sm font-extrabold text-blue-400">{comparativoManifesto.taxaFalta}%</span>
-                    </div>
-                  </div>
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition"
+                  >
+                    {editandoId ? 'Atualizar Voo' : 'Salvar Registro de Voo'}
+                  </button>
                 </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold shadow-md shadow-blue-600/30 transition flex items-center justify-center space-x-2"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>{editandoId ? 'Salvar Alterações do Voo' : 'Salvar Voo e Computar no Dashboard'}</span>
-                </button>
               </form>
-
             </div>
           )}
 
           {/* ========================================== */}
-          {/* ABA 3: GESTÃO DE FROTA E MODELOS DE AERONAVES */}
+          {/* ABA 3: GESTÃO DE FROTA */}
           {/* ========================================== */}
           {activeTab === 'aeronaves' && (
-            <div className="max-w-3xl mx-auto space-y-6">
-              
-              <div className={`p-8 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} shadow-xl space-y-6`}>
+            <div className={`p-8 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} space-y-6 shadow-xl`}>
+              <h3 className="text-sm font-extrabold flex items-center text-blue-400 border-b border-slate-800 pb-4">
+                <Plane className="w-4 h-4 mr-2" /> Gestão de Frota e Aeronaves Customizáveis
+              </h3>
+
+              <form onSubmit={handleAddAeronave} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                 <div>
-                  <h3 className="text-base font-extrabold flex items-center text-blue-400">
-                    <Plane className="w-5 h-5 mr-2" /> Gestão Manual de Modelos e Matrículas da Frota
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">Adicione novos modelos de aeronaves e matrículas padrão que serão disponibilizados no cadastro de voos.</p>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Modelo da Aeronave</label>
+                  <input
+                    type="text"
+                    value={novaAeronave.modelo}
+                    onChange={(e) => setNovaAeronave(prev => ({ ...prev, modelo: e.target.value }))}
+                    placeholder="Ex: C-105 Amazonas"
+                    className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
+                    required
+                  />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Matrícula Padrão</label>
+                  <input
+                    type="text"
+                    value={novaAeronave.matriculaPadrao}
+                    onChange={(e) => setNovaAeronave(prev => ({ ...prev, matriculaPadrao: e.target.value }))}
+                    placeholder="Ex: FAB 2701"
+                    className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
+                  />
+                </div>
+                <div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-md transition"
+                  >
+                    Adicionar Aeronave
+                  </button>
+                </div>
+              </form>
 
-                <form onSubmit={handleAddAeronave} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Modelo da Aeronave</label>
-                    <input
-                      type="text"
-                      value={novaAeronave.modelo}
-                      onChange={(e) => setNovaAeronave(prev => ({ ...prev, modelo: e.target.value }))}
-                      required
-                      placeholder="Ex: C-95 Bandeirante"
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Matrícula Padrão</label>
-                    <input
-                      type="text"
-                      value={novaAeronave.matriculaPadrao}
-                      onChange={(e) => setNovaAeronave(prev => ({ ...prev, matriculaPadrao: e.target.value }))}
-                      placeholder="Ex: FAB 2301"
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
+                {frotaAeronaves.map(a => (
+                  <div key={a.id} className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 flex items-center justify-between text-xs">
+                    <div>
+                      <strong className="text-slate-100 block">{a.modelo}</strong>
+                      <span className="text-slate-400">Matrícula Padrão: {a.matriculaPadrao}</span>
+                    </div>
                     <button
-                      type="submit"
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2"
+                      onClick={() => removerAeronave(a.id)}
+                      className="p-2 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition"
+                      title="Remover Aeronave"
                     >
-                      <PlusCircle className="w-4 h-4" />
-                      <span>Adicionar Aeronave</span>
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                </form>
-
-                <div className="border-t border-slate-800 pt-6 space-y-3">
-                  <h4 className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">Aeronaves Cadastradas na Frota ({frotaAeronaves.length})</h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {frotaAeronaves.map(a => (
-                      <div key={a.id} className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 flex items-center justify-between text-xs">
-                        <div>
-                          <strong className="text-slate-100 block">{a.modelo}</strong>
-                          <span className="text-slate-400">Matrícula Padrão: {a.matriculaPadrao}</span>
-                        </div>
-                        <button
-                          onClick={() => removerAeronave(a.id)}
-                          className="p-2 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition"
-                          title="Remover Aeronave"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+                ))}
               </div>
-
             </div>
           )}
 
         </div>
       </main>
-);
+    </div>
+  );
 }
 
 export default App;
+   

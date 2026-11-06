@@ -56,7 +56,7 @@ export default function App() {
       totalWeight: 1200,
       bagCount: 14,
       originalList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA', 'CEL CARLOS SOUZA'],
-      embarkedList: ['2S JOAO DA SILVA', 'SGT MARIA OLIVEIRA']
+      embarkedList: ['JOAO DA SILVA', 'MARIA OLIVEIRA']
     }
   ]);
 
@@ -87,16 +87,41 @@ export default function App() {
     return clean;
   };
 
-  // Processamento exato das linhas mantendo o nome completo estrito
-  const formOriginalList = newFlight.originalText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
-  const formEmbarkedList = newFlight.embarkedText.split('\n').map(s => s.trim().toUpperCase()).filter(Boolean);
+  // Função auxiliar para remover patentes/postos do início da linha e focar apenas no nome
+  const cleanNameOnly = (line) => {
+    let upper = line.trim().toUpperCase();
+    // Lista de prefixos comuns a remover (patentes, postos, tratamentos)
+    const prefixes = [
+      'MA/BR', 'TEN-BRIG', 'MAJ-BRIG', 'CEL', 'TC', 'MAJ', 'CAP', '1º TEN', '2º TEN', 'ASP', 
+      'SO', '1S', '2S', '3S', 'CB', 'SGT', 'SATA', 'CIV', 'SR', 'SRA', 'DR', 'DRA', 'SUBTEN'
+    ];
+    
+    // Remove pontuações extras e divide em palavras
+    let words = upper.split(/\s+/);
+    while (words.length > 0) {
+      let firstWord = words[0].replace(/[^A-Z0-9]/g, '');
+      // Se a primeira palavra for um prefixo ou número de posto (ex: 2S, 1º), remove do array
+      if (prefixes.includes(firstWord) || /^\d+[ºO]?[A-Z]*$/.test(firstWord)) {
+        words.shift();
+      } else {
+        break;
+      }
+    }
+    return words.join(' ');
+  };
+
+  const formOriginalList = newFlight.originalText.split('\n').map(s => s.trim()).filter(Boolean);
+  const formEmbarkedList = newFlight.embarkedText.split('\n').map(s => s.trim()).filter(Boolean);
   
   const formTotalPrev = Number(newFlight.paxTotal) || formOriginalList.length;
   
-  // Triangulação rigorosa por correspondência exata do nome completo
-  const embarkedMatchedCount = formOriginalList.filter(origName => formEmbarkedList.includes(origName)).length;
+  // Triangulação ignorando patentes e focando estritamente no nome limpo
+  const cleanOriginalNames = formOriginalList.map(cleanNameOnly);
+  const cleanEmbarkedNames = formEmbarkedList.map(cleanNameOnly);
+
+  const embarkedMatchedCount = cleanOriginalNames.filter(orig => cleanEmbarkedNames.includes(orig)).length;
   const formFaltas = Math.max(0, formOriginalList.length - embarkedMatchedCount);
-  const extraNamesCount = formEmbarkedList.filter(embName => !formOriginalList.includes(embName)).length;
+  const extraNamesCount = cleanEmbarkedNames.filter(emb => !cleanOriginalNames.includes(emb)).length;
   const formExtras = extraNamesCount;
   const formPercFaltas = formOriginalList.length > 0 ? ((formFaltas / formOriginalList.length) * 100).toFixed(1) : '0.0';
 
@@ -572,201 +597,4 @@ export default function App() {
                     <select 
                       value={newFlight.aircraft}
                       onChange={(e) => setNewFlight({ ...newFlight, aircraft: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white uppercase"
-                    >
-                      {fabAircrafts.map((ac, idx) => (
-                        <option key={idx} value={ac}>{ac}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">MATRÍCULA (NÃO OBRIGATÓRIA)</label>
-                    <input 
-                      type="text" 
-                      placeholder="EX: FAB 2310"
-                      value={newFlight.matricula}
-                      onChange={(e) => setNewFlight({ ...newFlight, matricula: e.target.value.toUpperCase() })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono uppercase"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">ROTA (EX: SBBR-SBGO)</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="SBBR-SBGO"
-                      value={newFlight.route}
-                      onChange={(e) => setNewFlight({ ...newFlight, route: e.target.value.toUpperCase() })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono uppercase"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">DATA DO VOO</label>
-                    <input 
-                      type="date" 
-                      required
-                      value={newFlight.date}
-                      onChange={(e) => setNewFlight({ ...newFlight, date: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">HORA DE CHAMADA</label>
-                    <input 
-                      type="text" 
-                      placeholder="1330"
-                      value={newFlight.callTime}
-                      onChange={(e) => setNewFlight({ ...newFlight, callTime: formatTimeInput(e.target.value) })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">HORA DE DECOLAGEM</label>
-                    <input 
-                      type="text" 
-                      placeholder="1400"
-                      value={newFlight.takeoffTime}
-                      onChange={(e) => setNewFlight({ ...newFlight, takeoffTime: formatTimeInput(e.target.value) })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">HORA REAL</label>
-                    <input 
-                      type="text" 
-                      placeholder="1420"
-                      value={newFlight.realTime}
-                      onChange={(e) => setNewFlight({ ...newFlight, realTime: formatTimeInput(e.target.value) })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">TOTAL DE PASSAGEIROS (PAX)</label>
-                    <input 
-                      type="number" 
-                      required
-                      placeholder="0"
-                      value={newFlight.paxTotal}
-                      onChange={(e) => setNewFlight({ ...newFlight, paxTotal: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono font-bold text-sky-400"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">PESO DE PAX (KG)</label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={newFlight.paxWeight}
-                      onChange={(e) => setNewFlight({ ...newFlight, paxWeight: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">PESO DE BAGAGEM (KG)</label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={newFlight.bagWeight}
-                      onChange={(e) => setNewFlight({ ...newFlight, bagWeight: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">TOTAL DE PESO (AUTO)</label>
-                    <input 
-                      type="text" 
-                      disabled
-                      value={`${(Number(newFlight.paxWeight) || 0) + (Number(newFlight.bagWeight) || 0)} KG`}
-                      className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2.5 text-sky-400 font-mono font-bold"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-400 mb-1">QUANTIDADE DE BAGAGENS</label>
-                    <input 
-                      type="number" 
-                      placeholder="0"
-                      value={newFlight.bagCount}
-                      onChange={(e) => setNewFlight({ ...newFlight, bagCount: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* SECÇÃO DE COPIAR E COLAR PASSAGEIROS */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
-                  <div className="space-y-2">
-                    <label className="block text-slate-300 font-semibold flex items-center uppercase">
-                      <FileSpreadsheet className="w-4 h-4 mr-1 text-sky-400" /> 1. COPIAR & COLAR RELAÇÃO PRINCIPAL
-                    </label>
-                    <p className="text-[10px] text-slate-400 font-sans normal-case">Insira o nome completo exato por linha (ex: 2S JOAO DA SILVA)</p>
-                    <textarea 
-                      rows="5"
-                      placeholder="2S JOAO DA SILVA&#10;SGT MARIA OLIVEIRA&#10;CEL CARLOS SOUZA"
-                      value={newFlight.originalText}
-                      onChange={(e) => setNewFlight({ ...newFlight, originalText: e.target.value.toUpperCase() })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white font-mono text-xs uppercase"
-                    ></textarea>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-slate-300 font-semibold flex items-center uppercase">
-                      <Users className="w-4 h-4 mr-1 text-emerald-400" /> 2. COPIAR & COLAR EFETIVAMENTE EMBARCADOS
-                    </label>
-                    <p className="text-[10px] text-slate-400 font-sans normal-case">O nome completo deve coincidir rigorosamente para contar como presente</p>
-                    <textarea 
-                      rows="5"
-                      placeholder="2S JOAO DA SILVA&#10;SGT MARIA OLIVEIRA&#10;NOVO PASSAGEIRO"
-                      value={newFlight.embarkedText}
-                      onChange={(e) => setNewFlight({ ...newFlight, embarkedText: e.target.value.toUpperCase() })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white font-mono text-xs uppercase"
-                    ></textarea>
-                  </div>
-                </div>
-
-                {/* RELATÓRIO DINÂMICO DE PASSAGEIROS COM VALIDAÇÃO RIGOROSA DE NOME COMPLETO */}
-                <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl grid grid-cols-2 sm:grid-cols-5 gap-3 text-center font-mono">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">TOTAL PREVISTO</span>
-                    <span className="text-base font-bold text-white">{formTotalPrev}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">EMBARCADOS (EXATOS)</span>
-                    <span className="text-base font-bold text-sky-400">{embarkedMatchedCount}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">FALTAS</span>
-                    <span className="text-base font-bold text-amber-400">{formFaltas}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">EXTRAS (+)</span>
-                    <span className="text-base font-bold text-emerald-400">{formExtras}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block">% FALTAS</span>
-                    <span className="text-base font-bold text-rose-400">{formPercFaltas}%</span>
-                  </div>
-                </div>
-
-                <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 rounded-lg transition-colors mt-4 tracking-wider">
-                  {editingId ? 'ATUALIZAR VOO NO POSTO CAN BR' : 'SALVAR VOO E GERAR RELATÓRIO DO POSTO CAN BR'}
-                </button>
-              </form>
-            </div>
-          )}
-
-        </main>
-      </div>
-    </div>
-  );
-}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2

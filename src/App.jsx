@@ -980,9 +980,6 @@ function TelaUtilizadores({ usuarios, aeronaves, onSalvarUsuario, onApagarUsuari
   );
 }
 
-/* ================================================================
-   APLICAÇÃO PRINCIPAL (APP)
-   ================================================================ */
 export default function App() {
   const [configurado, setConfigurado] = useState(supabaseConfigurado);
   const [online, setOnline] = useState(true);
@@ -1135,102 +1132,4 @@ export default function App() {
 
   const menus = [
     { id: 'dashboard', rotulo: 'Dashboard', icone: BarChart3 },
-    { id: 'painel', rotulo: 'Painel de voos', icone: Database },
-    { id: 'novo', rotulo: 'Adicionar voo', icone: PlusCircle },
-    { id: 'desembarque', rotulo: 'Desembarque', icone: UserCheck },
-    { id: 'relatorios', rotulo: 'Relatórios / PDF', icone: Printer },
-    ...(usuario.perfil === 'admin' ? [{ id: 'utilizadores', rotulo: 'Utilizadores', icone: Users }] : [])
-  ];
-
-  return (
-    <div className="min-h-screen bg-[#050a16] text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
-          <div className={`rounded-xl border px-5 py-3 text-xs font-bold uppercase shadow-2xl ${
-            toast.tipo === 'erro' ? 'border-rose-700 bg-rose-950 text-rose-300' : 'border-sky-700 bg-sky-950 text-sky-300'
-          }`}>
-            {toast.txt}
-          </div>
-        </div>
-      )}
-
-      {modal && <Modal dados={modal} onCancelar={() => setModal(null)} onConfirmar={modal.acao} />}
-
-      <header className="sticky top-0 z-40 border-b border-slate-800 bg-[#0c1424]/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setMenuMob(true)} className="rounded-xl border border-slate-800 p-2 lg:hidden">
-              <Menu size={18} />
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="rounded-xl bg-sky-600 p-2 text-white"><Plane size={18} /></div>
-              <div>
-                <span className="text-xs font-extrabold uppercase tracking-wider">FlightOps <span className="text-sky-400">BSB</span></span>
-                <span className="hidden text-[10px] uppercase text-slate-400 sm:block">Posto CAN BR — Base Aérea de Brasília</span>
-              </div>
-            </div>
-          </div>
-
-          <nav className="hidden items-center gap-1 lg:flex">
-            {menus.map((m) => {
-              const Icone = m.icone;
-              const ativo = tela === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => { setTela(m.id); setEditando(null); }}
-                  className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold uppercase transition ${
-                    ativo ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/30' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                  }`}
-                >
-                  <Icone size={15} /> {m.rotulo}
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <div className="text-xs font-bold uppercase text-white">{usuario.login}</div>
-              <div className="text-[10px] uppercase text-sky-400">{usuario.perfil === 'admin' ? 'Administrador' : 'Operador'}</div>
-            </div>
-            <button onClick={sair} title="Sair" className="rounded-xl border border-slate-800 bg-[#050a16] p-2.5 text-rose-400 hover:bg-slate-800">
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {menuMob && (
-        <div className="fixed inset-0 z-50 bg-black/70 lg:hidden" onClick={() => setMenuMob(false)}>
-          <div className={`${C.painel} m-4 w-76 space-y-2 p-5`} onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-slate-800 pb-3 font-bold uppercase text-sky-400">Menu — FlightOps BSB</div>
-            {menus.map((m) => {
-              const Icone = m.icone;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => { setTela(m.id); setEditando(null); setMenuMob(false); }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-xs font-bold uppercase ${
-                    tela === m.id ? 'bg-sky-600 text-white' : 'text-slate-300 hover:bg-slate-800'
-                  }`}
-                >
-                  <Icone size={16} /> {m.rotulo}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 print:p-0">
-        {tela === 'dashboard' && <TelaDashboard voos={voos} aeronaves={aeronaves} />}
-        {tela === 'painel' && <TelaPainel voos={voos} aeronaves={aeronaves} onEditar={(v) => { setEditando(v); setTela('novo'); }} onApagar={(v) => setModal({ titulo: 'Apagar voo', texto: `Tem certeza que deseja apagar o voo de ${v.aeronave} (${v.data_voo})?`, acao: () => apagarVooConfirmado(v) })} />}
-        {tela === 'novo' && <FormVoo aeronaves={aeronaves} voo={editando} onSalvar={salvarVoo} onCancelar={() => { setEditando(null); setTela('painel'); }} avisar={avisar} />}
-        {tela === 'desembarque' && <TelaDesembarque voos={voos} aeronaves={aeronaves} onSalvar={salvarDesembarque} avisar={avisar} />}
-        {tela === 'relatorios' && <TelaRelatorios voos={voos} aeronaves={aeronaves} />}
-        {tela === 'utilizadores' && usuario.perfil === 'admin' && <TelaUtilizadores usuarios={usuarios} aeronaves={aeronaves} onSalvarUsuario={salvarUtilizador} onApagarUsuario={apagarUtilizador} onSalvarAeronave={salvarAeronave} onApagarAeronave={apagarAeronave} usuarioAtual={usuario} avisar={avisar} />}
-      </main>
-    </div>
-  );
-}
+    { id: 'painel', rotulo: 'Painel de voos

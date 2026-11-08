@@ -77,27 +77,6 @@ export default function App() {
     }
   }
 
-  async function excluirDefinitivo(id) {
-    if (!window.confirm('Deseja excluir permanentemente?')) return;
-    try {
-      const { error } = await supabase.from('voos').delete().eq('id', id);
-      if (error) throw error;
-      carregarVoos();
-    } catch (err) {
-      alert('Erro: ' + err.message);
-    }
-  }
-
-  async function restaurarVoo(id) {
-    try {
-      const { error } = await supabase.from('voos').update({ excluido: false }).eq('id', id);
-      if (error) throw error;
-      carregarVoos();
-    } catch (err) {
-      alert('Erro ao restaurar: ' + err.message);
-    }
-  }
-
   const voosAtivos = voos.filter(v => !v.excluido);
   const voosLixeira = voos.filter(v => v.excluido);
 
@@ -111,8 +90,6 @@ export default function App() {
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'painel', label: 'Painel de Voos', icon: '📋' },
     { id: 'adicionar', label: 'Adicionar Voo', icon: '➕' },
-    { id: 'desembarque', label: 'Desembarque', icon: '🛬' },
-    { id: 'aeronave', label: 'Adicionar Aeronave', icon: '✈️' },
     { id: 'relatorio', label: 'Imprimir Relatório', icon: '🖨️' },
     { id: 'utilizadores', label: 'Utilizadores', icon: '👥' },
     { id: 'lixeira', label: `Lixeira (${voosLixeira.length})`, icon: '🗑️', danger: true }
@@ -121,8 +98,7 @@ export default function App() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#070c1b', color: '#f8fafc', fontFamily: 'sans-serif' }}>
       
-      {/* Sidebar Lateral */}
-      <div style={{ width: sidebarAberto ? '270px' : '80px', backgroundColor: '#090e21', borderRight: '1px solid #141f38', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', zIndex: 10 }}>
+      <div style={{ width: sidebarAberto ? '270px' : '80px', backgroundColor: '#090e21', borderRight: '1px solid #141f38', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '1px solid #141f38' }}>
           <div style={{ background: '#00b4d8', padding: '10px', borderRadius: '12px', color: '#070c1b', fontWeight: 'bold' }}>✈</div>
           {sidebarAberto && (
@@ -133,176 +109,40 @@ export default function App() {
           )}
         </div>
 
-        <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, overflowY: 'auto' }}>
+        <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
           {menuItems.map(item => {
             const ativo = menuAtivo === item.id;
             return (
               <div key={item.id} onClick={() => setMenuAtivo(item.id)} style={{ padding: '13px 16px', borderRadius: '10px', cursor: 'pointer', background: ativo ? (item.danger ? '#ef4444' : '#00b4d8') : 'transparent', color: ativo ? '#070c1b' : (item.danger ? '#f87171' : '#94a3b8'), fontWeight: ativo ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px' }}>
-                <span style={{ fontSize: '16px' }}>{item.icon}</span>
+                <span>{item.icon}</span>
                 {sidebarAberto && <span>{item.label}</span>}
               </div>
             );
           })}
         </div>
-
-        <div style={{ padding: '16px 12px', borderTop: '1px solid #141f38' }}>
-          <button onClick={() => setSidebarAberto(!sidebarAberto)} style={{ width: '100%', background: '#0e152e', border: '1px solid #1a2744', color: '#94a3b8', padding: '11px', borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-            {sidebarAberto ? '◀ Ocultar Menu' : '▶'}
-          </button>
-        </div>
       </div>
 
-      {/* Conteúdo Principal */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#070c1b' }}>
-        
-        {/* Topbar Superior */}
-        <div style={{ height: '75px', borderBottom: '1px solid #141f38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 35px', backgroundColor: '#070c1b' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontWeight: 'bold', fontSize: '16px' }}>FLIGHTOPS BSB</span>
-            <span style={{ color: '#64748b', fontSize: '12px' }}>POSTO CAN BR — BASE AÉREA DE BRASÍLIA (SBBR)</span>
-          </div>
-          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-            <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '6px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>● POSTO CAN BR OPERACIONAL</span>
-            <span style={{ background: '#0e152e', color: '#fff', border: '1px solid #1a2744', padding: '6px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>CAIO (ADMIN) 👤</span>
-          </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ height: '75px', borderBottom: '1px solid #141f38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 35px' }}>
+          <span style={{ fontWeight: 'bold', fontSize: '16px' }}>FLIGHTOPS BSB — POSTO CAN BR (SBBR)</span>
+          <span style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#34d399', padding: '6px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>● OPERACIONAL</span>
         </div>
 
-        {/* Área de Conteúdo */}
         <div style={{ padding: '30px', flex: 1, overflowY: 'auto' }}>
-          
           {menuAtivo === 'dashboard' && (
             <div>
-              {/* Filtros Operacionais */}
-              <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
-                <div style={{ color: '#00b4d8', fontSize: '11px', fontWeight: 'bold', marginBottom: '18px' }}>🔍 FILTROS OPERACIONAIS — POSTO CAN BR</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px', marginBottom: '15px' }}>
-                  <div>
-                    <label style={{ fontSize: '10px', color: '#64748b', display: 'block', marginBottom: '5px' }}>AERONAVE FAB</label>
-                    <select style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#fff', padding: '10px', borderRadius: '8px' }}>
-                      <option>TODAS AS AERONAVES</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', color: '#64748b', display: 'block', marginBottom: '5px' }}>DATA INICIAL</label>
-                    <input type="text" placeholder="dd/mm/aaaa" style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#fff', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', color: '#64748b', display: 'block', marginBottom: '5px' }}>DATA FINAL</label>
-                    <input type="text" placeholder="dd/mm/aaaa" style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#fff', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', color: '#64748b', display: 'block', marginBottom: '5px' }}>DATA ESPECÍFICA</label>
-                    <input type="text" placeholder="dd/mm/aaaa" style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#fff', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', color: '#64748b', display: 'block', marginBottom: '5px' }}>MÊS / ANO</label>
-                    <input type="text" placeholder("-------- de ----" style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#64748b', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', borderTop: '1px solid #141f38', paddingTop: '15px' }}>
-                  <div>
-                    <label style={{ fontSize: '10px', color: '#00b4d8', display: 'block', marginBottom: '5px' }}>📍 FILTRAR PAX POR LOCALIDADE / DESTINO:</label>
-                    <select style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#fff', padding: '10px', borderRadius: '8px' }}>
-                      <option>TODAS AS LOCALIDADES (GERAL)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: '10px', color: '#00b4d8', display: 'block', marginBottom: '5px' }}>👤 FILTRAR POR STATUS DE DESEMBARQUE:</label>
-                    <select style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#fff', padding: '10px', borderRadius: '8px' }}>
-                      <option>TODOS OS VOOS</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Perfil Estatístico */}
-              <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <span style={{ fontSize: '20px' }}>⏱️</span>
-                  <div>
-                    <div style={{ color: '#00b4d8', fontSize: '13px', fontWeight: 'bold' }}>PERFIL ESTATÍSTICA OPERACIONAL</div>
-                    <small style={{ color: '#64748b', fontSize: '11px' }}>Gere a visão consolidada por tipo de aeronave aplicando os filtros de data acima</small>
-                  </div>
-                </div>
-                <button style={{ backgroundColor: '#00b4d8', color: '#070c1b', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>GERAR ESTATÍSTICA</button>
-              </div>
-
-              {/* Cartões Superiores */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '24px' }}>
-                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px', height: '210px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>TOTAL DE VOOS</span>
-                    <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#38bdf8' }}>{totalVoos}</span>
-                  </div>
-                  <div style={{ backgroundColor: '#050814', border: '1px solid #141f38', borderRadius: '12px', height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '10px' }}>
-                    <div style={{ background: 'linear-gradient(180deg, #38bdf8, #0077b6)', width: '50px', height: '45px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff', fontSize: '13px' }}>
-                      {totalVoos}
-                    </div>
-                  </div>
+                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px' }}>
+                  <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>TOTAL DE VOOS</span>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#38bdf8', marginTop: '10px' }}>{totalVoos}</div>
                 </div>
-
-                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px', height: '210px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>TOTAL DE PASSAGEIROS (PAX)</span>
-                    <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#34d399' }}>{totalPax}</span>
-                  </div>
-                  <div style={{ backgroundColor: '#050814', border: '1px solid #141f38', borderRadius: '12px', height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '10px' }}>
-                    <div style={{ background: 'linear-gradient(180deg, #34d399, #059669)', width: '50px', height: '70px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#070c1b', fontSize: '13px' }}>
-                      {totalPax}
-                    </div>
-                  </div>
+                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px' }}>
+                  <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>TOTAL DE PASSAGEIROS (PAX)</span>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#34d399', marginTop: '10px' }}>{totalPax}</div>
                 </div>
-
-                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px', height: '210px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>TOTAL DESEMBARCADOS</span>
-                    <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#38bdf8' }}>0</span>
-                  </div>
-                  <div style={{ backgroundColor: '#050814', border: '1px solid #141f38', borderRadius: '12px', height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '10px' }}>
-                    <div style={{ background: 'linear-gradient(180deg, #38bdf8, #0077b6)', width: '50px', height: '40px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff', fontSize: '13px' }}>
-                      0
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cartões Inferiores de Pesos */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
-                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px', height: '210px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>PESO TOTAL PAX</span>
-                    <span style={{ fontSize: '22px', fontWeight: 'bold', color: '#38bdf8' }}>{pesoTotalPax} KG</span>
-                  </div>
-                  <div style={{ backgroundColor: '#050814', border: '1px solid #141f38', borderRadius: '12px', height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '10px' }}>
-                    <div style={{ background: 'linear-gradient(180deg, #6366f1, #3b82f6)', width: '60px', height: '60px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff', fontSize: '11px' }}>
-                      {pesoTotalPax}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px', height: '210px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>PESO TOTAL DE BAGAGEM</span>
-                    <span style={{ fontSize: '22px', fontWeight: 'bold', color: '#fbbf24' }}>{totalBagagem} KG</span>
-                  </div>
-                  <div style={{ backgroundColor: '#050814', border: '1px solid #141f38', borderRadius: '12px', height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '10px' }}>
-                    <div style={{ background: 'linear-gradient(180deg, #fbbf24, #d97706)', width: '60px', height: '60px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#070c1b', fontSize: '11px' }}>
-                      {totalBagagem}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px', height: '210px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>PESO TOTAL TRANSP.</span>
-                    <span style={{ fontSize: '22px', fontWeight: 'bold', color: '#f43f5e' }}>{pesoTotalTransp} KG</span>
-                  </div>
-                  <div style={{ backgroundColor: '#050814', border: '1px solid #141f38', borderRadius: '12px', height: '90px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: '10px' }}>
-                    <div style={{ background: 'linear-gradient(180deg, #f43f5e, #be123c)', width: '70px', height: '60px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#fff', fontSize: '11px' }}>
-                      {pesoTotalTransp} KG
-                    </div>
-                  </div>
+                <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '24px' }}>
+                  <span style={{ color: '#64748b', fontSize: '11px', fontWeight: 'bold' }}>PESO TOTAL TRANSP.</span>
+                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f43f5e', marginTop: '10px' }}>{pesoTotalTransp} KG</div>
                 </div>
               </div>
             </div>
@@ -345,31 +185,10 @@ export default function App() {
             </div>
           )}
 
-          {menuAtivo === 'desembarque' && (
-            <div style={{ color: '#94a3b8', padding: '40px', textAlign: 'center' }}>Módulo de Desembarque Ativo.</div>
-          )}
-
-          {menuAtivo === 'aeronave' && (
-            <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '30px', maxWidth: '800px', margin: '0 auto' }}>
-              <h3 style={{ color: '#00b4d8', marginBottom: '20px' }}>✈️ GERIR AERONAVES</h3>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <input type="text" placeholder="Nova Aeronave" value={novaAeronave} onChange={e => setNovaAeronave(e.target.value)} style={{ backgroundColor: '#050814', border: '1px solid #1a2744', color: '#fff', padding: '10px', borderRadius: '8px', flex: 1 }} />
-                <button onClick={() => { if(novaAeronave) { setAeronaves([...aeronaves, novaAeronave.toUpperCase()]); setNovaAeronave(''); }}} style={{ backgroundColor: '#00b4d8', border: 'none', color: '#070c1b', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>ADICIONAR</button>
-              </div>
-              {aeronaves.map(a => <div key={a} style={{ padding: '10px', borderBottom: '1px solid #141f38' }}>{a}</div>)}
-            </div>
-          )}
-
           {menuAtivo === 'relatorio' && (
             <div style={{ backgroundColor: '#090e21', border: '1px solid #141f38', borderRadius: '16px', padding: '30px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ color: '#00b4d8', margin: 0 }}>🖨️ IMPRESSÃO DE RELATÓRIO</h3>
-                <button onClick={() => window.print()} style={{ backgroundColor: '#00b4d8', color: '#070c1b', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>IMPRIMIR</button>
-              </div>
-              <div style={{ backgroundColor: '#fff', color: '#000', padding: '20px', borderRadius: '8px' }}>
-                <h4>Base Aérea de Brasília — Posto CAN BR</h4>
-                <p>Total de voos ativos: {totalVoos}</p>
-              </div>
+              <h3 style={{ color: '#00b4d8', marginBottom: '20px' }}>🖨️ RELATÓRIO</h3>
+              <button onClick={() => window.print()} style={{ backgroundColor: '#00b4d8', color: '#070c1b', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>IMPRIMIR</button>
             </div>
           )}
 
@@ -391,10 +210,6 @@ export default function App() {
                   {voosLixeira.map(voo => (
                     <div key={voo.id} style={{ backgroundColor: '#090e21', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '14px', padding: '20px' }}>
                       <h4 style={{ color: '#ef4444', margin: '0 0 10px 0' }}>{voo.prefixo}</h4>
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                        <button onClick={() => restaurarVoo(voo.id)} style={{ backgroundColor: '#00b4d8', border: 'none', color: '#070c1b', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>RESTAURAR</button>
-                        <button onClick={() => excluirDefinitivo(voo.id)} style={{ backgroundColor: '#ef4444', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>EXCLUIR</button>
-                      </div>
                     </div>
                   ))}
                 </div>

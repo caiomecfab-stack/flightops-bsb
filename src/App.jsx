@@ -1,1146 +1,626 @@
-import React, { useState, useMemo } from 'react';
-import {
-  Users,
-  Search,
-  Filter,
-  Calendar,
-  BarChart3,
-  Plane,
-  Briefcase,
-  Trash2,
-  Edit2,
-  AlertCircle,
-  Sun,
-  Moon,
-  Scale,
-  PlusCircle,
-  Check,
-  UserCheck,
-  UserX,
-  UserPlus,
+import React, { useState, useEffect } from 'react';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { 
+  Plane, 
+  Activity, 
+  PlusCircle, 
+  Filter, 
+  Users, 
+  Trash2, 
+  BarChart3, 
+  ShieldCheck, 
+  Menu, 
+  ChevronLeft,
+  RefreshCw,
+  LogOut,
   Clock,
-  Activity
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
+// ========================================================
+// CONFIGURAÇÃO DA NUVEM (SUPABASE)
+// ========================================================
+const SUPABASE_URL = 'https://pqhakpqcbndhgienvjzw.supabase.co';
+// Substitua o valor abaixo pela sua Publishable Key completa se ela tiver mais caracteres
+const SUPABASE_ANON_KEY = 'sb_publishable_PjVJXvye7P5IH1ZIRmqIpQ_l0XAz'; 
+
+const supabase = (SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 10)
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
 export default function App() {
-  const [darkMode, setDarkMode] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
-  // Lista de Voos Cadastrados Manualmente
-  const [voos, setVoos] = useState([]);
+  const [currentUser, setCurrentUser] = useState({ name: 'CAIO', role: 'ADMIN' });
+  const [authView, setAuthView] = useState('app'); // 'login' ou 'app'
+  const [loginInput, setLoginInput] = useState({ user: '', pass: '' });
 
-  // Estado para Edição de Voo
-  const [editandoId, setEditandoId] = useState(null);
-
-  // Frota Oficial da Força Aérea Brasileira (FAB) customizável
-  const [frotaAeronaves, setFrotaAeronaves] = useState([
-    { id: '1', modelo: 'C-95 Bandeirante', matriculaPadrao: 'FAB 2301' },
-    { id: '2', modelo: 'C-97 Brasília', matriculaPadrao: 'FAB 2350' },
-    { id: '3', modelo: 'C-98 Caravan', matriculaPadrao: 'FAB 2720' },
-    { id: '4', modelo: 'C-99 (ERJ-145)', matriculaPadrao: 'FAB 2591' },
-    { id: '5', modelo: 'C-105 Amazonas (C-295)', matriculaPadrao: 'FAB 2701' },
-    { id: '6', modelo: 'C-130 Hércules', matriculaPadrao: 'FAB 2101' },
-    { id: '7', modelo: 'KC-390 Millennium', matriculaPadrao: 'FAB 2850' },
-    { id: '8', modelo: 'KC-30 (A330-200)', matriculaPadrao: 'FAB 2801' },
-    { id: '9', modelo: 'VC-2 (ERJ-190)', matriculaPadrao: 'FAB 2590' },
-    { id: '10', modelo: 'H-36 Caracal', matriculaPadrao: 'FAB 2230' }
+  const [usersList, setUsersList] = useState([
+    { name: 'CAIO', pass: 'admin123', role: 'ADMIN' }
   ]);
 
-  // Formulário para nova aeronave
-  const [novaAeronave, setNovaAeronave] = useState({ modelo: '', matriculaPadrao: '' });
+  const [newUserForm, setNewUserForm] = useState({ name: '', pass: '', role: 'OPERADOR' });
+  const [adminNewPass, setAdminNewPass] = useState('');
 
-  // Estados dos Filtros Temporários e Aplicados
-  const [filtroProjetoTemp, setFiltroProjetoTemp] = useState('todos');
-  const [filtroDataTemp, setFiltroDataTemp] = useState('');
-  const [filtroDataInicioTemp, setFiltroDataInicioTemp] = useState('');
-  const [filtroDataFimTemp, setFiltroDataFimTemp] = useState('');
-  const [filtroMesTemp, setFiltroMesTemp] = useState('todos');
-  const [filtroAnoTemp, setFiltroAnoTemp] = useState('todos');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const [filtrosAplicados, setFiltrosAplicados] = useState({
-    projeto: 'todos',
-    data: '',
-    dataInicio: '',
-    dataFim: '',
-    mes: 'todos',
-    ano: 'todos'
+  // ESTADO DOS VOOS
+  const [flights, setFlights] = useState([
+    {
+      id: '1',
+      anv: 'FAB 2101',
+      etapa: 'SBBR - SBRJ',
+      chamada: '10:00',
+      decolagemPrevista: '11:00',
+      envolvimentoInicio: '10:10',
+      envolvimentoFim: '10:50',
+      status: 'CONCLUIDO',
+      operador: 'CAIO',
+      data: new Date().toISOString().split('T')[0]
+    }
+  ]);
+
+  const [filterStatus, setFilterStatus] = useState('TODOS');
+  const [filterData, setFilterData] = useState('');
+
+  // FORMULÁRIO DE NOVO VOO
+  const [newFlight, setNewFlight] = useState({
+    anv: '',
+    etapa: '',
+    chamada: '',
+    decolagemPrevista: '',
+    envolvimentoInicio: '',
+    envolvimentoFim: '',
+    status: 'EM ANDAMENTO'
   });
 
-  // Estado do Formulário de Voo Manual
-  const [formData, setFormData] = useState({
-    projeto: 'C-99',
-    modeloAeronave: 'C-99 (ERJ-145)',
-    matricula: 'FAB 2591',
-    rota: 'SBBR - SBGL',
-    dataVoo: '2026-11-05',
-    horarioChamada: '16:00',
-    horarioDecolagem: '17:00',
-    horarioEmbarqueReal: '17:10',
-    totalPax: 48,
-    pesoPax: 3876,
-    pesoBagagem: 529,
-    totalPeso: 4405,
-    qtyBagagem: 17,
-    textoListaPrevista: '',
-    textoListaRealizada: ''
-  });
+  // ========================================================
+  // PERSISTÊNCIA E SINCRONIZAÇÃO EM TEMPO REAL (REALTIME)
+  // ========================================================
+  useEffect(() => {
+    if (!supabase) return;
 
-  // Mapeamento automático de Projeto para Aeronave e Matrícula
-  const associarProjetoComAeronave = (proj) => {
-    const pUpper = proj.toUpperCase();
-    let modeloMatch = 'C-99 (ERJ-145)';
-    let matMatch = 'FAB 2591';
+    // Carregar dados iniciais do Supabase
+    const fetchStorage = async () => {
+      const { data, error } = await supabase
+        .from('app_storage')
+        .select('*')
+        .eq('key', 'flightops_data')
+        .single();
 
-    if (pUpper.includes('C-95')) {
-      modeloMatch = 'C-95 Bandeirante';
-      matMatch = 'FAB 2301';
-    } else if (pUpper.includes('C-97')) {
-      modeloMatch = 'C-97 Brasília';
-      matMatch = 'FAB 2350';
-    } else if (pUpper.includes('C-98')) {
-      modeloMatch = 'C-98 Caravan';
-      matMatch = 'FAB 2720';
-    } else if (pUpper.includes('C-99')) {
-      modeloMatch = 'C-99 (ERJ-145)';
-      matMatch = 'FAB 2591';
-    } else if (pUpper.includes('C-105') || pUpper.includes('C295')) {
-      modeloMatch = 'C-105 Amazonas (C-295)';
-      matMatch = 'FAB 2701';
-    } else if (pUpper.includes('C-130') || pUpper.includes('HERCULES')) {
-      modeloMatch = 'C-130 Hércules';
-      matMatch = 'FAB 2101';
-    } else if (pUpper.includes('KC-390') || pUpper.includes('390')) {
-      modeloMatch = 'KC-390 Millennium';
-      matMatch = 'FAB 2850';
-    } else if (pUpper.includes('KC-30') || pUpper.includes('A330')) {
-      modeloMatch = 'KC-30 (A330-200)';
-      matMatch = 'FAB 2801';
-    } else if (pUpper.includes('VC-2')) {
-      modeloMatch = 'VC-2 (ERJ-190)';
-      matMatch = 'FAB 2590';
-    } else if (pUpper.includes('H-36')) {
-      modeloMatch = 'H-36 Caracal';
-      matMatch = 'FAB 2230';
-    }
-
-    return { modeloMatch, matMatch };
-  };
-
-  const horaParaMinutos = (horaStr) => {
-    if (!horaStr || !horaStr.includes(':')) return 0;
-    const [h, m] = horaStr.split(':').map(Number);
-    return (h || 0) * 60 + (m || 0);
-  };
-
-  const calcularEficiencia = (chamada, embarqueReal) => {
-    const minChamada = horaParaMinutos(chamada);
-    const minReal = horaParaMinutos(embarqueReal);
-    if (minReal <= 0 || minChamada <= 0) return 100;
-    const razao = (minChamada / minReal) * 100;
-    return Math.min(Math.max(Number(razao.toFixed(1)), 10), 150);
-  };
-
-  const comparativoManifesto = useMemo(() => {
-    const parseNomes = (texto) => {
-      if (!texto) return [];
-      return texto
-        .split('\n')
-        .map(n => n.trim())
-        .filter(n => n.length > 0)
-        .map(n => n.toUpperCase());
+      if (data && data.value) {
+        if (data.value.flights) setFlights(data.value.flights);
+        if (data.value.usersList) setUsersList(data.value.usersList);
+      }
     };
 
-    const previstos = parseNomes(formData.textoListaPrevista);
-    const realizados = parseNomes(formData.textoListaRealizada);
+    fetchStorage();
 
-    if (previstos.length === 0 && realizados.length === 0) {
-      return { comparativo: [], presentes: 0, faltaram: 0, novos: 0, taxaFalta: 0 };
-    }
+    // Sincronização em Tempo Real (Realtime Channel)
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_storage', filter: 'key=eq.flightops_data' },
+        (payload) => {
+          if (payload.new && payload.new.value) {
+            setFlights(payload.new.value.flights || []);
+            setUsersList(payload.new.value.usersList || []);
+          }
+        }
+      )
+      .subscribe();
 
-    const setRealizados = new Set(realizados);
-    const setPrevistos = new Set(previstos);
-
-    const comparativo = [];
-    let presentes = 0;
-    let faltaram = 0;
-    let novos = 0;
-
-    previstos.forEach(nome => {
-      const presente = setRealizados.has(nome);
-      if (presente) {
-        presentes++;
-        comparativo.push({ nome, status: 'PRESENTE' });
-      } else {
-        faltaram++;
-        comparativo.push({ nome, status: 'FALTOU' });
-      }
-    });
-
-    realizados.forEach(nome => {
-      if (!setPrevistos.has(nome)) {
-        novos++;
-        comparativo.push({ nome, status: 'PAX NOVO' });
-      }
-    });
-
-    const totalPrevistos = previstos.length || 1;
-    const taxaFalta = Number(((faltaram / totalPrevistos) * 100).toFixed(1));
-
-    return {
-      comparativo,
-      presentes,
-      faltaram,
-      novos,
-      taxaFalta
+    return () => {
+      supabase.removeChannel(channel);
     };
-  }, [formData.textoListaPrevista, formData.textoListaRealizada]);
+  }, []);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value };
-      
-      if (name === 'projeto') {
-        const { modeloMatch, matMatch } = associarProjetoComAeronave(value);
-        updated.modeloAeronave = modeloMatch;
-        updated.matricula = matMatch;
-      }
-
-      if (name === 'pesoPax' || name === 'pesoBagagem') {
-        const pPax = name === 'pesoPax' ? (Number(value) || 0) : Number(prev.pesoPax);
-        const pBag = name === 'pesoBagagem' ? (Number(value) || 0) : Number(prev.pesoBagagem);
-        updated.totalPeso = pPax + pBag;
-      }
-      return updated;
+  // Guardar alterações na nuvem
+  const saveDataToCloud = async (newFlights, newUsers) => {
+    if (!supabase) return;
+    await supabase.from('app_storage').upsert({
+      key: 'flightops_data',
+      value: { flights: newFlights, usersList: newUsers },
+      updated_at: new Date().toISOString()
     });
   };
 
-  const handleModeloChange = (e) => {
-    const modeloSelecionado = e.target.value;
-    const aeronaveEncontrada = frotaAeronaves.find(a => a.modelo === modeloSelecionado);
-    setFormData(prev => ({
-      ...prev,
-      modeloAeronave: modeloSelecionado,
-      matricula: aeronaveEncontrada ? aeronaveEncontrada.matriculaPadrao : prev.matricula
-    }));
+  // ========================================================
+  // LÓGICA DE NEGÓCIO E MÉTRICAS
+  // ========================================================
+  const parseMinutes = (timeStr) => {
+    if (!timeStr || !timeStr.includes(':')) return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
   };
 
-  const handleSubmitVoo = (e) => {
+  // FÓRMULA DE EFETIVIDADE CORRIGIDA:
+  // (Tempo Previsto entre Chamada e Decolagem / Tempo Real de Envolvimento) * 100
+  const calculateEfetividade = (flight) => {
+    const tChamada = parseMinutes(flight.chamada);
+    const tDecolagem = parseMinutes(flight.decolagemPrevista);
+    const tInicioEnv = parseMinutes(flight.envolvimentoInicio);
+    const tFimEnv = parseMinutes(flight.envolvimentoFim);
+
+    const tempoPrevisto = tDecolagem - tChamada;
+    const tempoRealEnvolvimento = tFimEnv - tInicioEnv;
+
+    if (tempoPrevisto <= 0 || tempoRealEnvolvimento <= 0) return 0;
+
+    const ef = (tempoPrevisto / tempoRealEnvolvimento) * 100;
+    return Math.min(Math.round(ef), 100); // Limita ao máximo de 100%
+  };
+
+  // AÇÕES
+  const handleAddFlight = (e) => {
     e.preventDefault();
-    const pPax = Number(formData.pesoPax) || 0;
-    const pBag = Number(formData.pesoBagagem) || 0;
-    const tPeso = Number(formData.totalPeso) || (pPax + pBag);
-    const ef = calcularEficiencia(formData.horarioChamada, formData.horarioEmbarqueReal || formData.horarioDecolagem);
-
-    const dadosVoo = {
-      id: editandoId ? editandoId : `voo-${Date.now()}`,
-      projeto: formData.projeto.trim().toUpperCase() || 'GERAL',
-      modeloAeronave: formData.modeloAeronave,
-      matricula: formData.matricula.trim() || 'S/M',
-      rota: formData.rota.trim() || 'SBBR - SBBR',
-      dataVoo: formData.dataVoo,
-      horarioChamada: formData.horarioChamada || '00:00',
-      horarioDecolagem: formData.horarioDecolagem || '00:00',
-      horarioEmbarqueReal: formData.horarioEmbarqueReal || formData.horarioDecolagem || '00:00',
-      eficiencia: ef,
-      totalPax: Number(formData.totalPax) || 0,
-      pesoPax: pPax,
-      pesoBagagem: pBag,
-      totalPeso: tPeso,
-      qtyBagagem: Number(formData.qtyBagagem) || 0,
-      manifestoComparativo: comparativoManifesto
+    const flightToAdd = {
+      ...newFlight,
+      id: Date.now().toString(),
+      operador: currentUser.name,
+      data: new Date().toISOString().split('T')[0]
     };
-
-    if (editandoId) {
-      setVoos(prev => prev.map(v => v.id === editandoId ? dadosVoo : v));
-      setEditandoId(null);
-    } else {
-      setVoos(prev => [dadosVoo, ...prev]);
-    }
-
+    const updatedFlights = [flightToAdd, ...flights];
+    setFlights(updatedFlights);
+    saveDataToCloud(updatedFlights, usersList);
+    setNewFlight({
+      anv: '',
+      etapa: '',
+      chamada: '',
+      decolagemPrevista: '',
+      envolvimentoInicio: '',
+      envolvimentoFim: '',
+      status: 'EM ANDAMENTO'
+    });
     setActiveTab('dashboard');
   };
 
-  const handleAddAeronave = (e) => {
+  const handleUpdateStatus = (id, newStatus) => {
+    const updated = flights.map(f => f.id === id ? { ...f, status: newStatus } : f);
+    setFlights(updated);
+    saveDataToCloud(updated, usersList);
+  };
+
+  const handleDeleteFlight = (id) => {
+    if (confirm('Deseja realmente apagar este registo de voo?')) {
+      const updated = flights.filter(f => f.id !== id);
+      setFlights(updated);
+      saveDataToCloud(updated, usersList);
+    }
+  };
+
+  const handleAddUser = (e) => {
     e.preventDefault();
-    if (!novaAeronave.modelo.trim()) return;
-    const item = {
-      id: `aero-${Date.now()}`,
-      modelo: novaAeronave.modelo.trim(),
-      matriculaPadrao: novaAeronave.matriculaPadrao.trim() || 'FAB S/M'
-    };
-    setFrotaAeronaves(prev => [...prev, item]);
-    setNovaAeronave({ modelo: '', matriculaPadrao: '' });
+    if (!newUserForm.name || !newUserForm.pass) return;
+    const updatedUsers = [...usersList, newUserForm];
+    setUsersList(updatedUsers);
+    saveDataToCloud(flights, updatedUsers);
+    setNewUserForm({ name: '', pass: '', role: 'OPERADOR' });
   };
 
-  const removerAeronave = (id) => {
-    setFrotaAeronaves(prev => prev.filter(a => a.id !== id));
+  const handleChangePassword = (e) => {
+    e.preventDefault();
+    const updatedUsers = usersList.map(u => u.name === currentUser.name ? { ...u, pass: adminNewPass } : u);
+    setUsersList(updatedUsers);
+    saveDataToCloud(flights, updatedUsers);
+    setAdminNewPass('');
+    alert('Palavra-passe alterada com sucesso!');
   };
 
-  const iniciarEdicao = (voo) => {
-    setFormData({
-      projeto: voo.projeto,
-      modeloAeronave: voo.modeloAeronave,
-      matricula: voo.matricula,
-      rota: voo.rota,
-      dataVoo: voo.dataVoo,
-      horarioChamada: voo.horarioChamada,
-      horarioDecolagem: voo.horarioDecolagem,
-      horarioEmbarqueReal: voo.horarioEmbarqueReal || voo.horarioDecolagem,
-      totalPax: voo.totalPax,
-      pesoPax: voo.pesoPax,
-      pesoBagagem: voo.pesoBagagem,
-      totalPeso: voo.totalPeso,
-      qtyBagagem: voo.qtyBagagem,
-      textoListaPrevista: voo.manifestoComparativo ? voo.manifestoComparativo.comparativo.filter(c => c.status !== 'PAX NOVO').map(c => c.nome).join('\n') : '',
-      textoListaRealizada: voo.manifestoComparativo ? voo.manifestoComparativo.comparativo.filter(c => c.status === 'PRESENTE' || c.status === 'PAX NOVO').map(c => c.nome).join('\n') : ''
-    });
-    setEditandoId(voo.id);
-    setActiveTab('registro');
+  const handleLogin = (e) => {
+    e.preventDefault();
+    const found = usersList.find(u => u.name.toUpperCase() === loginInput.user.toUpperCase() && u.pass === loginInput.pass);
+    if (found) {
+      setCurrentUser(found);
+      setAuthView('app');
+    } else {
+      alert('Utilizador ou palavra-passe incorretos!');
+    }
   };
 
-  const excluirVoo = (id) => {
-    setVoos(prev => prev.filter(v => v.id !== id));
-  };
+  // FILTROS
+  const filteredFlights = flights.filter(f => {
+    const matchStatus = filterStatus === 'TODOS' || f.status === filterStatus;
+    const matchData = !filterData || f.data === filterData;
+    return matchStatus && matchData;
+  });
 
-  const aplicarFiltros = () => {
-    setFiltrosAplicados({
-      projeto: filtroProjetoTemp,
-      data: filtroDataTemp,
-      mes: filtroMesTemp,
-      ano: filtroAnoTemp
-    });
-  };
+  // MÉTRICAS
+  const totalVoos = filteredFlights.length;
+  const voosConcluidos = filteredFlights.filter(f => f.status === 'CONCLUIDO');
+  const mediaEfetividade = voosConcluidos.length > 0
+    ? Math.round(voosConcluidos.reduce((acc, f) => acc + calculateEfetividade(f), 0) / voosConcluidos.length)
+    : 0;
 
-  const limparFiltros = () => {
-    setFiltroProjetoTemp('todos');
-    setFiltroDataTemp('');
-    setFiltroDataInicioTemp('');
-    setFiltroDataFimTemp('');
-    setFiltroMesTemp('todos');
-    setFiltroAnoTemp('todos');
-    setFiltrosAplicados({
-      projeto: 'todos',
-      data: '',
-      dataInicio: '',
-      dataFim: '',
-      mes: 'todos',
-      ano: 'todos'
-    });
-  };
-
-  const projetosDisponiveis = useMemo(() => {
-    const setProjs = new Set(voos.map(v => v.projeto));
-    return Array.from(setProjs);
-  }, [voos]);
-
-  const mesesDisponiveis = [
-    { value: '01', label: 'Janeiro' },
-    { value: '02', label: 'Fevereiro' },
-    { value: '03', label: 'Março' },
-    { value: '04', label: 'Abril' },
-    { value: '05', label: 'Maio' },
-    { value: '06', label: 'Junho' },
-    { value: '07', label: 'Julho' },
-    { value: '08', label: 'Agosto' },
-    { value: '09', label: 'Setembro' },
-    { value: '10', label: 'Outubro' },
-    { value: '11', label: 'Novembro' },
-    { value: '12', label: 'Dezembro' }
-  ];
-
-  const anosDisponiveis = useMemo(() => {
-    const setAnos = new Set(voos.map(v => v.dataVoo ? v.dataVoo.split('-')[0] : ''));
-    return Array.from(setAnos).filter(Boolean);
-  }, [voos]);
-
-  const voosFiltrados = useMemo(() => {
-    return voos.filter(v => {
-      const matchProjeto = filtrosAplicados.projeto === 'todos' || v.projeto === filtrosAplicados.projeto;
-      const matchData = !filtrosAplicados.data || v.dataVoo === filtrosAplicados.data;
-      
-      let matchPeriodo = true;
-      if (filtrosAplicados.dataInicio && filtrosAplicados.dataFim && v.dataVoo) {
-        matchPeriodo = v.dataVoo >= filtrosAplicados.dataInicio && v.dataVoo <= filtrosAplicados.dataFim;
-      } else if (filtrosAplicados.dataInicio && v.dataVoo) {
-        matchPeriodo = v.dataVoo >= filtrosAplicados.dataInicio;
-      } else if (filtrosAplicados.dataFim && v.dataVoo) {
-        matchPeriodo = v.dataVoo <= filtrosAplicados.dataFim;
-      }
-
-      const [anoVoo, mesVoo] = v.dataVoo ? v.dataVoo.split('-') : ['', ''];
-      const matchMes = filtrosAplicados.mes === 'todos' || mesVoo === filtrosAplicados.mes;
-      const matchAno = filtrosAplicados.ano === 'todos' || anoVoo === filtrosAplicados.ano;
-
-      return matchProjeto && matchData && matchPeriodo && matchMes && matchAno;
-    });
-  }, [voos, filtrosAplicados]);
-
-  const voosAgrupadosPorProjeto = useMemo(() => {
-    const mapa = {};
-    voosFiltrados.forEach(v => {
-      const p = v.projeto;
-      if (!mapa[p]) {
-        mapa[p] = {
-          projeto: p,
-          totalPax: 0,
-          pesoPax: 0,
-          pesoBagagem: 0,
-          totalPeso: 0,
-          qtyBagagem: 0,
-          qtdVoos: 0,
-          somaEficiencia: 0,
-          aeronaves: new Set()
-        };
-      }
-      mapa[p].totalPax += v.totalPax;
-      mapa[p].pesoPax += v.pesoPax;
-      mapa[p].pesoBagagem += v.pesoBagagem;
-      mapa[p].totalPeso += v.totalPeso;
-      mapa[p].qtyBagagem += v.qtyBagagem;
-      mapa[p].qtdVoos += 1;
-      mapa[p].somaEficiencia += (v.eficiencia || 100);
-      mapa[p].aeronaves.add(v.modeloAeronave);
-    });
-
-    return Object.values(mapa).map(item => ({
-      ...item,
-      eficienciaMedia: Number((item.somaEficiencia / item.qtdVoos).toFixed(1)),
-      aeronavesStr: Array.from(item.aeronaves).join(', ')
-    }));
-  }, [voosFiltrados]);
-
-  return (
-    <div className={`min-h-screen flex font-sans relative overflow-hidden ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      
-      {/* FUNDO COM IMAGEM REAL DE AERONAVE EM VOO (FOTO HD COM PANORAMA E SOBREPOSIÇÃO) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <style>{`
-          @keyframes slowPan {
-            0% { transform: scale(1.05) translate(0px, 0px); }
-            50% { transform: scale(1.15) translate(-30px, -15px); }
-            100% { transform: scale(1.05) translate(0px, 0px); }
-          }
-          .animate-real-plane {
-            animation: slowPan 35s ease-in-out infinite;
-          }
-        `}</style>
-        
-        {/* Imagem Fotográfica Real de Aeronave Militar em Voo com Movimento Lento */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-25 animate-real-plane filter contrast-125"
-          style={{ backgroundImage: `url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=2000&q=80')` }}
-        ></div>
-
-        {/* Gradiente Escuro para Garantir Contraste Perfeito */}
-        <div className={`absolute inset-0 ${darkMode ? 'bg-gradient-to-br from-slate-950/95 via-slate-900/90 to-slate-950/95' : 'bg-gradient-to-br from-slate-100/90 via-white/85 to-slate-200/90'}`}></div>
-      </div>
-
-      {/* SIDEBAR */}
-      <aside className={`w-64 flex-shrink-0 flex flex-col justify-between border-r z-10 ${darkMode ? 'bg-slate-900/90 backdrop-blur-md border-slate-800' : 'bg-white/90 backdrop-blur-md border-slate-200'}`}>
-        <div>
-          <div className="p-6 border-b border-slate-800 flex items-center space-x-3">
-            <div className="bg-blue-600 text-white p-2 rounded-xl shadow-lg shadow-blue-600/30">
-              <Plane className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-extrabold text-xs uppercase tracking-wider">FlightOps BSB</h1>
-              <p className="text-[10px] text-blue-400 font-bold">Base Aérea de Brasília</p>
+  // ========================================================
+  // RENDERIZAÇÃO
+  // ========================================================
+  if (authView === 'login') {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="bg-slate-800 border border-slate-700 p-8 rounded-xl shadow-2xl w-full max-w-md">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 bg-blue-600 rounded-full">
+              <Plane className="w-8 h-8 text-white" />
             </div>
           </div>
+          <h2 className="text-2xl font-bold text-center text-white mb-2">POSTO CAN BR (SBBR)</h2>
+          <p className="text-slate-400 text-center mb-6 text-sm">Sistema de Gestão de Voos Operacionais</p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-300 uppercase">Utilizador</label>
+              <input 
+                type="text" 
+                required
+                className="w-full mt-1 bg-slate-900 border border-slate-700 rounded p-2.5 text-white focus:outline-none focus:border-blue-500"
+                value={loginInput.user}
+                onChange={e => setLoginInput({ ...loginInput, user: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-300 uppercase">Palavra-passe</label>
+              <input 
+                type="password" 
+                required
+                className="w-full mt-1 bg-slate-900 border border-slate-700 rounded p-2.5 text-white focus:outline-none focus:border-blue-500"
+                value={loginInput.pass}
+                onChange={e => setLoginInput({ ...loginInput, pass: e.target.value })}
+              />
+            </div>
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-colors">
+              Entrar no Sistema
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
-          <nav className="p-4 space-y-2">
-            <button
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
+      {/* SIDEBAR */}
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 border-r border-slate-800 transition-all duration-300 flex flex-col justify-between`}>
+        <div>
+          <div className="p-4 flex items-center justify-between border-b border-slate-800">
+            <div className="flex items-center gap-3">
+              <Plane className="w-6 h-6 text-blue-500 shrink-0" />
+              {sidebarOpen && <span className="font-bold text-lg tracking-wider">POSTO CAN</span>}
+            </div>
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1 hover:bg-slate-800 rounded">
+              {sidebarOpen ? <ChevronLeft size={20} /> : <Menu size={20} />}
+            </button>
+          </div>
+
+          <nav className="p-2 space-y-1">
+            <button 
               onClick={() => setActiveTab('dashboard')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold transition ${
-                activeTab === 'dashboard'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100'
-              }`}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}
             >
-              <BarChart3 className="w-4 h-4" />
-              <span>Dashboard & Cômputo</span>
+              <Activity size={20} />
+              {sidebarOpen && <span>Painel Operacional</span>}
             </button>
 
-            <button
-              onClick={() => setActiveTab('registro')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold transition ${
-                activeTab === 'registro'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100'
-              }`}
+            <button 
+              onClick={() => setActiveTab('novo-voo')}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'novo-voo' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}
             >
-              <PlusCircle className="w-4 h-4" />
-              <span>{editandoId ? 'Editar Voo' : 'Cadastrar Voo Manual'}</span>
+              <PlusCircle size={20} />
+              {sidebarOpen && <span>Registar Voo</span>}
             </button>
 
-            <button
-              onClick={() => setActiveTab('aeronaves')}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-xs font-bold transition ${
-                activeTab === 'aeronaves'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                  : darkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <Plane className="w-4 h-4" />
-              <span>Gestão de Frota / Aeronaves</span>
-            </button>
+            {currentUser.role === 'ADMIN' && (
+              <button 
+                onClick={() => setActiveTab('usuarios')}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'usuarios' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 text-slate-400'}`}
+              >
+                <Users size={20} />
+                {sidebarOpen && <span>Gestão de Utilizadores</span>}
+              </button>
+            )}
           </nav>
         </div>
 
-        <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500">
-          <span>CAN v2.9</span>
-          <button
-            onClick={() => setDarkMode(!darkMode)}
-            className="p-2 rounded-lg bg-slate-800 text-amber-400 hover:bg-slate-700 transition"
+        <div className="p-4 border-t border-slate-800">
+          {sidebarOpen && (
+            <div className="mb-3">
+              <p className="text-xs text-slate-500">Sessão ativa</p>
+              <p className="text-sm font-bold text-blue-400">{currentUser.name} ({currentUser.role})</p>
+            </div>
+          )}
+          <button 
+            onClick={() => setAuthView('login')}
+            className="w-full flex items-center gap-2 p-2 hover:bg-red-500/10 text-red-400 rounded-lg text-sm transition-colors"
           >
-            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            <LogOut size={18} />
+            {sidebarOpen && <span>Sair</span>}
           </button>
         </div>
       </aside>
 
       {/* CONTEÚDO PRINCIPAL */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden z-10">
-        
-        <header className={`px-8 py-5 border-b flex items-center justify-between ${darkMode ? 'bg-slate-900/80 backdrop-blur-md border-slate-800' : 'bg-white/80 backdrop-blur-md border-slate-200'}`}>
-          <div>
-            <h2 className="text-lg font-extrabold tracking-tight">
-              FlightOps BSB - Gestão de voos e pax do CAN
-            </h2>
-            <p className="text-xs text-slate-400">Base Aérea de Brasília - Controle Operacional de Passageiros e Carga</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              Total de Voos: {voos.length}
-            </span>
-          </div>
-        </header>
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+        {/* DASHBOARD */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h1 className="text-2xl font-bold">Painel de Controlo de Voos</h1>
+                <p className="text-sm text-slate-400">Monitorização em Tempo Real — SBBR</p>
+              </div>
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+              {/* BARRA DE FILTROS */}
+              <div className="flex flex-wrap items-center gap-3 bg-slate-900 p-2 rounded-lg border border-slate-800">
+                <Filter size={16} className="text-slate-400 ml-2" />
+                <select 
+                  className="bg-slate-800 text-xs rounded border border-slate-700 p-1.5 focus:outline-none"
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value)}
+                >
+                  <option value="TODOS">Todos os Status</option>
+                  <option value="EM ANDAMENTO">Em Andamento</option>
+                  <option value="CONCLUIDO">Concluído</option>
+                  <option value="CANCELADO">Cancelado</option>
+                </select>
 
-          {/* ========================================== */}
-          {/* ABA 1: DASHBOARD & CÔMPUTO POR PROJETO */}
-          {/* ========================================== */}
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6">
-              
-              {/* FILTROS COM BOTÃO FILTRAR E INTERVALO DE DATAS */}
-              <div className={`p-6 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} space-y-4 shadow-xl`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-blue-400 flex items-center">
-                    <Filter className="w-4 h-4 mr-2" /> Filtros de Cômputo e Consulta
-                  </span>
-                  <button onClick={limparFiltros} className="text-xs text-blue-400 hover:underline font-bold">
-                    Limpar Filtros
-                  </button>
+                <input 
+                  type="date" 
+                  className="bg-slate-800 text-xs rounded border border-slate-700 p-1.5 focus:outline-none"
+                  value={filterData}
+                  onChange={e => setFilterData(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* CARDS DE MÉTRICAS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400 uppercase font-semibold">Total de Voos</p>
+                  <h3 className="text-3xl font-bold mt-1">{totalVoos}</h3>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Projeto</label>
-                    <select
-                      value={filtroProjetoTemp}
-                      onChange={(e) => setFiltroProjetoTemp(e.target.value)}
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    >
-                      <option value="todos">Todos os Projetos</option>
-                      {projetosDisponiveis.map(p => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Data Específica</label>
-                    <input
-                      type="date"
-                      value={filtroDataTemp}
-                      onChange={(e) => setFiltroDataTemp(e.target.value)}
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Data Início (Período)</label>
-                    <input
-                      type="date"
-                      value={filtroDataInicioTemp}
-                      onChange={(e) => setFiltroDataInicioTemp(e.target.value)}
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Data Fim (Período)</label>
-                    <input
-                      type="date"
-                      value={filtroDataFimTemp}
-                      onChange={(e) => setFiltroDataFimTemp(e.target.value)}
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Mês / Ano</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <select
-                        value={filtroMesTemp}
-                        onChange={(e) => setFiltroMesTemp(e.target.value)}
-                        className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                      >
-                        <option value="todos">Mês</option>
-                        {mesesDisponiveis.map(m => (
-                          <option key={m.value} value={m.value}>{m.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={filtroAnoTemp}
-                        onChange={(e) => setFiltroAnoTemp(e.target.value)}
-                        className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                      >
-                        <option value="todos">Ano</option>
-                        {anosDisponiveis.map(a => (
-                          <option key={a} value={a}>{a}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <button
-                      onClick={() => setFiltrosAplicados({
-                        projeto: filtroProjetoTemp,
-                        data: filtroDataTemp,
-                        dataInicio: filtroDataInicioTemp,
-                        dataFim: filtroDataFimTemp,
-                        mes: filtroMesTemp,
-                        ano: filtroAnoTemp
-                      })}
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2"
-                    >
-                      <Search className="w-4 h-4" />
-                      <span>Filtrar</span>
-                    </button>
-                  </div>
+                <div className="p-3 bg-blue-500/10 text-blue-400 rounded-lg">
+                  <Plane size={24} />
                 </div>
               </div>
 
-              {voos.length === 0 ? (
-                <div className={`p-12 rounded-2xl border backdrop-blur-md text-center space-y-4 shadow-xl ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
-                  <AlertCircle className="w-12 h-12 text-amber-400 mx-auto" />
-                  <h3 className="text-sm font-bold">Nenhum voo registrado</h3>
-                  <p className="text-xs text-slate-400">Utilize a aba de cadastro manual para registrar voos e cargas.</p>
-                  <button onClick={() => setActiveTab('registro')} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold">
-                    Cadastrar Voo
-                  </button>
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400 uppercase font-semibold">Voos Concluídos</p>
+                  <h3 className="text-3xl font-bold mt-1 text-emerald-400">{voosConcluidos.length}</h3>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* CÔMPUTO CONSOLIDADO POR PROJETO */}
-                  <div className={`p-6 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} space-y-4 shadow-xl`}>
-                    <h3 className="text-sm font-extrabold flex items-center text-blue-400">
-                      <BarChart3 className="w-4 h-4 mr-2" /> Cômputo Consolidado por Projeto (Voos duplicados somados automaticamente)
-                    </h3>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {voosAgrupadosPorProjeto.map(item => (
-                        <div key={item.projeto} className="p-5 rounded-xl bg-slate-800/40 border border-slate-700 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="px-3 py-1 rounded-lg bg-blue-500/10 text-blue-400 font-extrabold text-xs border border-blue-500/20">
-                              Projeto: {item.projeto}
-                            </span>
-                            <span className="text-xs text-slate-400 font-semibold">{item.qtdVoos} voo(s)</span>
-                          </div>
-
-                          <div className="space-y-1.5 text-xs">
-                            <p className="text-slate-300"><strong>Aeronaves:</strong> {item.aeronavesStr}</p>
-                            <p className="text-emerald-400 font-bold">Total de PAX: {item.totalPax} passageiros</p>
-                            <p className="text-indigo-400">Total Bagagens: {item.qtyBagagem} vol. ({item.pesoBagagem} kg)</p>
-                            <p className="text-amber-400 font-semibold">Peso Geral Acumulado: {item.totalPeso} kg</p>
-                            <p className="text-cyan-400 font-bold">Eficiência Média: {item.eficienciaMedia}%</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* DETALHAMENTO DOS VOOS NO FILTRO */}
-                  <div className={`p-6 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} space-y-4 shadow-xl`}>
-                    <h3 className="text-sm font-extrabold flex items-center text-blue-400">
-                      <Plane className="w-4 h-4 mr-2" /> Detalhamento dos Voos no Filtro & Comparativo de Manifestos
-                    </h3>
-
-                    <div className="space-y-4">
-                      {voosFiltrados.map(v => (
-                        <div key={v.id} className="p-5 rounded-xl bg-slate-800/30 border border-slate-800 space-y-4 text-xs">
-                          <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <span className="px-2.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-bold border border-blue-500/20 text-[10px]">
-                                  {v.projeto}
-                                </span>
-                                <span className="font-extrabold text-sm">{v.modeloAeronave} ({v.matricula})</span>
-                              </div>
-                              <p className="text-slate-300 mt-1">Rota: <strong>{v.rota}</strong> — Data: <strong>{v.dataVoo}</strong></p>
-                              <p className="text-slate-400 mt-0.5">Chamada: {v.horarioChamada} | Decolagem: {v.horarioDecolagem} | Emb. Real: {v.horarioEmbarqueReal || v.horarioDecolagem} | <strong className="text-emerald-400">Eficiência: {v.eficiencia}%</strong></p>
-                            </div>
-
-                            <div className="flex items-center space-x-3">
-                              <span className="px-3 py-1.5 rounded-xl bg-indigo-500/10 text-indigo-400 font-bold border border-indigo-500/20">
-                                📦 {v.qtyBagagem} vol. ({v.pesoBagagem} kg)
-                              </span>
-                              <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
-                                👥 {v.totalPax} PAX ({v.totalPeso} kg)
-                              </span>
-                              <button
-                                onClick={() => iniciarEdicao(v)}
-                                className="p-2 rounded-xl bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition"
-                                title="Editar Voo"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => excluirVoo(v.id)}
-                                className="p-2 rounded-xl bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition"
-                                title="Excluir Voo"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Se houver dados comparativos de manifesto */}
-                          {v.manifestoComparativo && v.manifestoComparativo.comparativo.length > 0 && (
-                            <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/50 space-y-3">
-                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-                                <span className="font-extrabold text-slate-300">Resumo Comparativo de Embarque:</span>
-                                <div className="flex items-center space-x-3 text-[11px]">
-                                  <span className="text-emerald-400 font-bold">Presentes: {v.manifestoComparativo.presentes}</span>
-                                  <span className="text-rose-400 font-bold">Faltaram: {v.manifestoComparativo.faltaram}</span>
-                                  <span className="text-amber-400 font-bold">Pax Novos: {v.manifestoComparativo.novos}</span>
-                                  <span className="text-blue-400 font-bold">Taxa de Faltas: {v.manifestoComparativo.taxaFalta}%</span>
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-40 overflow-y-auto pr-1">
-                                {v.manifestoComparativo.comparativo.map((c, idxC) => (
-                                  <div key={idxC} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-700/40 text-[11px]">
-                                    <span className="font-medium truncate mr-2">{c.nome}</span>
-                                    <span className={`px-2 py-0.5 rounded font-extrabold text-[9px] ${
-                                      c.status === 'PRESENTE' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                                      c.status === 'FALTOU' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                                      'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                    }`}>
-                                      {c.status}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* GRÁFICO DE BARRAS VERTICAL NO RODAPÉ */}
-                  <div className={`p-6 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} space-y-4 shadow-xl`}>
-                    <h3 className="text-sm font-extrabold flex items-center text-blue-400">
-                      <BarChart3 className="w-4 h-4 mr-2" /> Gráfico Comparativo Geral de Cômputo (Barras Verticais)
-                    </h3>
-                    <p className="text-xs text-slate-400">Comparação visual de passageiros e peso total por voo filtrado.</p>
-
-                    <div className="pt-6 pb-2 flex items-end justify-around gap-4 h-64 border-b border-slate-800 overflow-x-auto">
-                      {voosFiltrados.map((v, idx) => {
-                        const maxP = Math.max(...voosFiltrados.map(item => Math.max(item.totalPax, item.totalPeso / 50)), 1);
-                        const hPax = Math.max(Math.round((v.totalPax / maxP) * 160), 20);
-                        const hPeso = Math.max(Math.round(((v.totalPeso / 50) / maxP) * 160), 20);
-
-                        return (
-                          <div key={v.id || idx} className="flex flex-col items-center h-full justify-end flex-1 min-w-[70px] group">
-                            <div className="flex items-end justify-center space-x-1.5 w-full h-44 pb-2">
-                              <div
-                                className="w-6 bg-blue-500 rounded-t-lg transition-all duration-300 group-hover:bg-blue-400 relative flex items-start justify-center pt-1"
-                                style={{ height: `${hPax}px` }}
-                                title={`Pax: ${v.totalPax}`}
-                              >
-                                <span className="text-[9px] font-bold text-white -rotate-90 origin-bottom mt-1">{v.totalPax}p</span>
-                              </div>
-                              <div
-                                className="w-6 bg-emerald-500 rounded-t-lg transition-all duration-300 group-hover:bg-emerald-400 relative flex items-start justify-center pt-1"
-                                style={{ height: `${hPeso}px` }}
-                                title={`Peso Total: ${v.totalPeso} kg`}
-                              >
-                                <span className="text-[9px] font-bold text-white -rotate-90 origin-bottom mt-1">{v.totalPeso}kg</span>
-                              </div>
-                            </div>
-                            <div className="text-center mt-2 border-t border-slate-800 pt-1 w-full">
-                              <span className="text-[11px] font-extrabold text-blue-400 block truncate">{v.projeto}</span>
-                              <span className="text-[9px] text-slate-400 block truncate">{v.dataVoo}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center justify-center space-x-6 text-xs pt-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="w-3 h-3 rounded bg-blue-500 inline-block"></span>
-                        <span className="text-slate-300 font-semibold">Total de Passageiros (PAX)</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="w-3 h-3 rounded bg-emerald-500 inline-block"></span>
-                        <span className="text-slate-300 font-semibold">Peso Total (kg) / Escala</span>
-                      </div>
-                    </div>
-                  </div>
-
+                <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                  <CheckCircle2 size={24} />
                 </div>
-              )}
+              </div>
 
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400 uppercase font-semibold">Média de Efetividade</p>
+                  <h3 className="text-3xl font-bold mt-1 text-blue-400">{mediaEfetividade}%</h3>
+                </div>
+                <div className="p-3 bg-blue-500/10 text-blue-400 rounded-lg">
+                  <BarChart3 size={24} />
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* ========================================== */}
-          {/* ABA 2: CADASTRAR OU EDITAR VOO MANUALMENTE */}
-          {/* ========================================== */}
-          {activeTab === 'registro' && (
-            <div className="max-w-2xl mx-auto space-y-6">
-              
-              <form onSubmit={handleSubmitVoo} className={`p-8 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} shadow-xl space-y-5`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-extrabold flex items-center text-blue-400">
-                      <PlusCircle className="w-5 h-5 mr-2" /> {editandoId ? 'Editar Voo Cadastrado' : 'Inserção Manual de Voo e Carga'}
-                    </h3>
-                    <p className="text-xs text-slate-400 mt-1">Preencha os horários (com minutos livres ex: 10:34) e calcule a eficiência operacional.</p>
-                  </div>
-                  {editandoId && (
-                    <button
-                      type="button"
-                      onClick={() => { setEditandoId(null); setActiveTab('dashboard'); }}
-                      className="text-xs text-rose-400 underline font-bold"
-                    >
-                      Cancelar
-                    </button>
-                  )}
+            {/* TABELA DE VOOS */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-800/50 text-xs text-slate-400 border-b border-slate-800">
+                      <th className="p-4">ANV / Etapa</th>
+                      <th className="p-4">Chamada</th>
+                      <th className="p-4">Decolagem Prev.</th>
+                      <th className="p-4">Envolvimento (Início - Fim)</th>
+                      <th className="p-4">Efetividade</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-sm">
+                    {filteredFlights.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="p-8 text-center text-slate-500">
+                          Nenhum registo de voo encontrado.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredFlights.map(flight => {
+                        const ef = calculateEfetividade(flight);
+                        return (
+                          <tr key={flight.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="p-4 font-semibold">
+                              <div>{flight.anv}</div>
+                              <div className="text-xs font-normal text-slate-400">{flight.etapa}</div>
+                            </td>
+                            <td className="p-4 text-slate-300">{flight.chamada}</td>
+                            <td className="p-4 text-slate-300">{flight.decolagemPrevista}</td>
+                            <td className="p-4 text-slate-300">
+                              {flight.envolvimentoInicio} - {flight.envolvimentoFim}
+                            </td>
+                            <td className="p-4">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${ef >= 80 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                                {ef}%
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <select 
+                                className="bg-slate-800 text-xs border border-slate-700 rounded p-1 focus:outline-none"
+                                value={flight.status}
+                                onChange={e => handleUpdateStatus(flight.id, e.target.value)}
+                              >
+                                <option value="EM ANDAMENTO">EM ANDAMENTO</option>
+                                <option value="CONCLUIDO">CONCLUÍDO</option>
+                                <option value="CANCELADO">CANCELADO</option>
+                              </select>
+                            </td>
+                            <td className="p-4">
+                              <button 
+                                onClick={() => handleDeleteFlight(flight.id)}
+                                className="p-1.5 hover:bg-red-500/20 text-red-400 rounded transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* REGISTAR VOO */}
+        {activeTab === 'novo-voo' && (
+          <div className="max-w-2xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-xl">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <PlusCircle className="text-blue-500" /> Registar Novo Voo Operacional
+            </h2>
+
+            <form onSubmit={handleAddFlight} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Aeronave (ANV)</label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="Ex: FAB 2101"
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded p-2.5 text-white"
+                    value={newFlight.anv}
+                    onChange={e => setNewFlight({ ...newFlight, anv: e.target.value })}
+                  />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Projeto / Identificador (Ex: C-95, C-97, C-99)</label>
-                    <input
-                      type="text"
-                      name="projeto"
-                      value={formData.projeto}
-                      onChange={handleInputChange}
-                      required
-                      placeholder="Ex: C-99"
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Modelo da Aeronave (FAB)</label>
-                    <select
-                      name="modeloAeronave"
-                      value={formData.modeloAeronave}
-                      onChange={handleModeloChange}
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    >
-                      {frotaAeronaves.map(a => (
-                        <option key={a.modelo} value={a.modelo}>{a.modelo}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Etapa</label>
+                  <input 
+                    type="text" 
+                    required 
+                    placeholder="Ex: SBBR - SBRJ"
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded p-2.5 text-white"
+                    value={newFlight.etapa}
+                    onChange={e => setNewFlight({ ...newFlight, etapa: e.target.value })}
+                  />
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Matrícula (Opcional)</label>
-                    <input
-                      type="text"
-                      name="matricula"
-                      value={formData.matricula}
-                      onChange={handleInputChange}
-                      placeholder="Ex: FAB 2591"
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Rota (Ex: SBBR - SBGL)</label>
-                    <input
-                      type="text"
-                      name="rota"
-                      value={formData.rota}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Data do Voo</label>
-                    <input
-                      type="date"
-                      name="dataVoo"
-                      value={formData.dataVoo}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Hora de Chamada</label>
+                  <input 
+                    type="time" 
+                    required 
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded p-2.5 text-white"
+                    value={newFlight.chamada}
+                    onChange={e => setNewFlight({ ...newFlight, chamada: e.target.value })}
+                  />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Hora Chamada (Previsto)</label>
-                    <input
-                      type="time"
-                      name="horarioChamada"
-                      value={formData.horarioChamada}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Hora Decolagem</label>
-                    <input
-                      type="time"
-                      name="horarioDecolagem"
-                      value={formData.horarioDecolagem}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Hora Embarque Real (Execução)</label>
-                    <input
-                      type="time"
-                      name="horarioEmbarqueReal"
-                      value={formData.horarioEmbarqueReal}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Decolagem Prevista</label>
+                  <input 
+                    type="time" 
+                    required 
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded p-2.5 text-white"
+                    value={newFlight.decolagemPrevista}
+                    onChange={e => setNewFlight({ ...newFlight, decolagemPrevista: e.target.value })}
+                  />
                 </div>
+              </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Total de PAX</label>
-                    <input
-                      type="number"
-                      name="totalPax"
-                      value={formData.totalPax}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Peso Pax (kg)</label>
-                    <input
-                      type="number"
-                      name="pesoPax"
-                      value={formData.pesoPax}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Peso Bagagem (kg)</label>
-                    <input
-                      type="number"
-                      name="pesoBagagem"
-                      value={formData.pesoBagagem}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Total de Peso (kg)</label>
-                    <input
-                      type="number"
-                      name="totalPeso"
-                      value={formData.totalPeso}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Qtd Bagagens</label>
-                    <input
-                      type="number"
-                      name="qtyBagagem"
-                      value={formData.qtyBagagem}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Início de Envolvimento</label>
+                  <input 
+                    type="time" 
+                    required 
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded p-2.5 text-white"
+                    value={newFlight.envolvimentoInicio}
+                    onChange={e => setNewFlight({ ...newFlight, envolvimentoInicio: e.target.value })}
+                  />
                 </div>
-
-                {/* COPIAR E COLAR LISTAS DE NOMES PARA COMPARATIVO */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-800">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1 flex items-center">
-                      <Users className="w-3.5 h-3.5 mr-1 text-blue-400" /> 1ª Relação (Manifesto Previsto)
-                    </label>
-                    <textarea
-                      name="textoListaPrevista"
-                      rows="5"
-                      value={formData.textoListaPrevista}
-                      onChange={handleInputChange}
-                      placeholder="Cole aqui os nomes da primeira relação (um por linha)..."
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    ></textarea>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1 flex items-center">
-                      <UserCheck className="w-3.5 h-3.5 mr-1 text-emerald-400" /> 2ª Relação (Realizado de Embarque)
-                    </label>
-                    <textarea
-                      name="textoListaRealizada"
-                      rows="5"
-                      value={formData.textoListaRealizada}
-                      onChange={handleInputChange}
-                      placeholder="Cole aqui os nomes reais que embarcaram (um por linha)..."
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    ></textarea>
-                  </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400">Fim de Envolvimento</label>
+                  <input 
+                    type="time" 
+                    required 
+                    className="w-full mt-1 bg-slate-800 border border-slate-700 rounded p-2.5 text-white"
+                    value={newFlight.envolvimentoFim}
+                    onChange={e => setNewFlight({ ...newFlight, envolvimentoFim: e.target.value })}
+                  />
                 </div>
+              </div>
 
-                {/* PAINEL DE RESULTADO COMPARATIVO E EFICIÊNCIA */}
-                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-extrabold text-blue-400 uppercase tracking-wider">Eficiência Operacional & Comparativo</h4>
-                    <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-cyan-400 font-extrabold text-xs border border-cyan-500/20">
-                      Índice: {calcularEficiencia(formData.horarioChamada, formData.horarioEmbarqueReal || formData.horarioDecolagem)}%
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                    <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                      <span className="text-xs text-slate-400 block">Presentes</span>
-                      <span className="text-sm font-extrabold text-emerald-400">{comparativoManifesto.presentes}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20">
-                      <span className="text-xs text-slate-400 block">Faltaram</span>
-                      <span className="text-sm font-extrabold text-rose-400">{comparativoManifesto.faltaram}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                      <span className="text-xs text-slate-400 block">Pax Novos</span>
-                      <span className="text-sm font-extrabold text-amber-400">{comparativoManifesto.novos}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                      <span className="text-xs text-slate-400 block">% de Faltas</span>
-                      <span className="text-sm font-extrabold text-blue-400">{comparativoManifesto.taxaFalta}%</span>
-                    </div>
-                  </div>
-                </div>
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-lg transition-colors mt-4">
+                Salvar Registo de Voo
+              </button>
+            </form>
+          </div>
+        )}
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold shadow-md shadow-blue-600/30 transition flex items-center justify-center space-x-2"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>{editandoId ? 'Salvar Alterações do Voo' : 'Salvar Voo e Computar no Dashboard'}</span>
+        {/* GESTÃO DE UTILIZADORES */}
+        {activeTab === 'usuarios' && currentUser.role === 'ADMIN' && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <ShieldCheck className="text-blue-500" /> Alterar Minha Palavra-passe
+              </h2>
+              <form onSubmit={handleChangePassword} className="flex gap-4">
+                <input 
+                  type="password" 
+                  required
+                  placeholder="Nova palavra-passe"
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded p-2 text-white"
+                  value={adminNewPass}
+                  onChange={e => setAdminNewPass(e.target.value)}
+                />
+                <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-semibold text-sm">
+                  Atualizar
                 </button>
               </form>
-
             </div>
-          )}
 
-          {/* ========================================== */}
-          {/* ABA 3: GESTÃO DE FROTA E MODELOS DE AERONAVES */}
-          {/* ========================================== */}
-          {activeTab === 'aeronaves' && (
-            <div className="max-w-3xl mx-auto space-y-6">
-              
-              <div className={`p-8 rounded-2xl border backdrop-blur-md ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'} shadow-xl space-y-6`}>
-                <div>
-                  <h3 className="text-base font-extrabold flex items-center text-blue-400">
-                    <Plane className="w-5 h-5 mr-2" /> Gestão Manual de Modelos e Matrículas da Frota
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">Adicione novos modelos de aeronaves e matrículas padrão que serão disponibilizados no cadastro de voos.</p>
-                </div>
-
-                <form onSubmit={handleAddAeronave} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Modelo da Aeronave</label>
-                    <input
-                      type="text"
-                      value={novaAeronave.modelo}
-                      onChange={(e) => setNovaAeronave(prev => ({ ...prev, modelo: e.target.value }))}
-                      required
-                      placeholder="Ex: C-95 Bandeirante"
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Matrícula Padrão</label>
-                    <input
-                      type="text"
-                      value={novaAeronave.matriculaPadrao}
-                      onChange={(e) => setNovaAeronave(prev => ({ ...prev, matriculaPadrao: e.target.value }))}
-                      placeholder="Ex: FAB 2301"
-                      className={`w-full text-xs p-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200'}`}
-                    />
-                  </div>
-
-                  <div>
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      <span>Adicionar Aeronave</span>
-                    </button>
-                  </div>
-                </form>
-
-                <div className="border-t border-slate-800 pt-6 space-y-3">
-                  <h4 className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">Aeronaves Cadastradas na Frota ({frotaAeronaves.length})</h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {frotaAeronaves.map(a => (
-                      <div key={a.id} className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 flex items-center justify-between text-xs">
-                        <div>
-                          <strong className="text-slate-100 block">{a.modelo}</strong>
-                          <span className="text-slate-400">Matrícula Padrão: {a.matriculaPadrao}</span>
-                        </div>
-                        <button
-                          onClick={() => removerAeronave(a.id)}
-                          className="p-2 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition"
-                          title="Remover Aeronave"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Users className="text-blue-500" /> Criar Novo Utilizador
+              </h2>
+              <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input 
+                  type="text" 
+                  required
+                  placeholder="Nome de Utilizador"
+                  className="bg-slate-800 border border-slate-700 rounded p-2 text-white"
+                  value={newUserForm.name}
+                  onChange={e => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                />
+                <input 
+                  type="password" 
+                  required
+                  placeholder="Palavra-passe"
+                  className="bg-slate-800 border border-slate-700 rounded p-2 text-white"
+                  value={newUserForm.pass}
+                  onChange={e => setNewUserForm({ ...newUserForm, pass: e.target.value })}
+                />
+                <select 
+                  className="bg-slate-800 border border-slate-700 rounded p-2 text-white"
+                  value={newUserForm.role}
+                  onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                >
+                  <option value="OPERADOR">OPERADOR</option>
+                  <option value="ADMIN">ADMINISTRADOR</option>
+                </select>
+                <button type="submit" className="md:col-span-3 bg-emerald-600 hover:bg-emerald-500 py-2 rounded font-bold text-sm">
+                  Registar Utilizador
+                </button>
+              </form>
             </div>
-          )}
-
-        </div>
+          </div>
+        )}
       </main>
     </div>
   );

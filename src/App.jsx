@@ -3,219 +3,196 @@ import { supabase } from './supabase';
 
 export default function App() {
   const [voos, setVoos] = useState([]);
-  const [lixeira, setLixeira] = useState([]);
-  const [mostrarLixeira, setMostrarLixeira] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [menuAtivo, setMenuAtivo] = useState('painel');
+  const [sidebarAberto, setSidebarAberto] = useState(true);
 
-  // Formulário para novo voo
-  const [form, setForm] = useState({
-    prefixo: '',
-    rota: '',
-    horario: '',
-    status: 'Programado'
-  });
-
-  // Carregar dados do Supabase ao iniciar
   useEffect(() => {
-    carregarDados();
+    carregarVoos();
   }, []);
 
-  async function carregarDados() {
-    setLoading(true);
-    // Voos ativos (excluida = false ou null)
-    const { data: dadosVoos, error: errVoos } = await supabase
-      .from('voos')
-      .select('*')
-      .eq('excluido', false)
-      .order('created_at', { ascending: false });
-
-    // Voos na lixeira (excluida = true)
-    const { data: dadosLixeira, error: errLixeira } = await supabase
-      .from('voos')
-      .select('*')
-      .eq('excluido', true)
-      .order('created_at', { ascending: false });
-
-    if (!errVoos) setVoos(dadosVoos || []);
-    if (!errLixeira) setLixeira(dadosLixeira || []);
-    setLoading(false);
-  }
-
-  // Adicionar Voo
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!form.prefixo || !form.rota) return alert('Preencha os campos obrigatórios!');
-
-    const { error } = await supabase.from('voos').insert([
-      { ...form, excluido: false }
-    ]);
-
-    if (error) {
-      alert('Erro ao guardar voo: ' + error.message);
-    } else {
-      setForm({ prefixo: '', rota: '', horario: '', status: 'Programado' });
-      carregarDados();
+  async function carregarVoos() {
+    try {
+      const { data, error } = await supabase.from('voos').select('*');
+      if (error) throw error;
+      if (data) setVoos(data);
+    } catch (err) {
+      console.error('Erro ao carregar voos:', err.message);
     }
   }
 
-  // Enviar para a Lixeira (com confirmação)
-  async function confirmarEExcluir(id, prefixo) {
-    const confirmar = window.confirm(`Tem a certeza de que deseja excluir o voo ${prefixo}? Ele será movido para a lixeira.`);
+  async function moverParaLixeira(id, prefixo) {
+    const confirmar = window.confirm(`Deseja realmente excluir o voo ${prefixo}?`);
     if (!confirmar) return;
 
-    const { error } = await supabase
-      .from('voos')
-      .update({ excluido: true })
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('voos')
+        .update({ excluido: true })
+        .eq('id', id);
 
-    if (error) {
-      alert('Erro ao excluir: ' + error.message);
-    } else {
-      carregarDados();
+      if (error) throw error;
+      carregarVoos();
+    } catch (err) {
+      alert('Erro ao excluir voo: ' + err.message);
     }
   }
 
-  // Restaurar da Lixeira
+  async function excluirDefinitivo(id) {
+    const confirmar = window.confirm('Deseja excluir este item permanentemente?');
+    if (!confirmar) return;
+
+    try {
+      const { error } = await supabase
+        .from('voos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      carregarVoos();
+    } catch (err) {
+      alert('Erro ao excluir definitivamente: ' + err.message);
+    }
+  }
+
   async function restaurarVoo(id) {
-    const { error } = await supabase
-      .from('voos')
-      .update({ excluido: false })
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('voos')
+        .update({ excluido: false })
+        .eq('id', id);
 
-    if (error) {
-      alert('Erro ao restaurar: ' + error.message);
-    } else {
-      carregarDados();
+      if (error) throw error;
+      carregarVoos();
+    } catch (err) {
+      alert('Erro ao restaurar voo: ' + err.message);
     }
   }
+
+  const voosAtivos = voos.filter(v => !v.excluido);
+  const voosLixeira = voos.filter(v => v.excluido);
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h2>Posto CAN BR (SBBR) - Gestão de Voos</h2>
-
-      {/* Formulário de Registo */}
-      <form onSubmit={handleSubmit} style={{ background: '#f4f4f4', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
-        <h3>Adicionar Novo Voo</h3>
-        <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: '1fr 1fr' }}>
-          <input 
-            type="text" 
-            placeholder="Prefixo da Aeronave" 
-            value={form.prefixo} 
-            onChange={e => setForm({...form, prefixo: e.target.value})} 
-            required 
-            style={{ padding: '8px' }}
-          />
-          <input 
-            type="text" 
-            placeholder="Rota (ex: SBBR - SBGR)" 
-            value={form.rota} 
-            onChange={e => setForm({...form, rota: e.target.value})} 
-            required 
-            style={{ padding: '8px' }}
-          />
-          <input 
-            type="time" 
-            value={form.horario} 
-            onChange={e => setForm({...form, horario: e.target.value})} 
-            style={{ padding: '8px' }}
-          />
-          <select 
-            value={form.status} 
-            onChange={e => setForm({...form, status: e.target.value})}
-            style={{ padding: '8px' }}
-          >
-            <option value="Programado">Programado</option>
-            <option value="Em Curso">Em Curso</option>
-            <option value="Realizado">Realizado</option>
-          </select>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#0b132b', color: '#fff', fontFamily: 'sans-serif' }}>
+      
+      {/* Menu Lateral */}
+      <div style={{ width: sidebarAberto ? '260px' : '80px', backgroundColor: '#070b19', borderRight: '1px solid #1c2541', transition: 'width 0.3s', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #1c2541' }}>
+          <div style={{ backgroundColor: '#00b4d8', padding: '8px', borderRadius: '8px', fontWeight: 'bold' }}>✈</div>
+          {sidebarAberto && <span style={{ fontWeight: 'bold', fontSize: '18px', color: '#00b4d8' }}>FLIGHTOPS BSB</span>}
         </div>
-        <button type="submit" style={{ marginTop: '10px', padding: '10px 20px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          Salvar Voo na Nuvem
-        </button>
-      </form>
 
-      {/* Botão para Alternar Lixeira */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h3>{mostrarLixeira ? '🗑️ Itens na Lixeira' : '✈️ Voos Ativos'}</h3>
-        <button 
-          onClick={() => setMostrarLixeira(!mostrarLixeira)}
-          style={{ padding: '8px 15px', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          {mostrarLixeira ? 'Ver Voos Ativos' : `🗑️ Ver Lixeira (${lixeira.length})`}
-        </button>
+        <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+          <div 
+            onClick={() => setMenuAtivo('painel')}
+            style={{ padding: '12px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'painel' ? '#1d3557' : 'transparent', display: 'flex', alignItems: 'center', gap: '10px' }}
+          >
+            📊 {sidebarAberto && <span>Painel de Voos</span>}
+          </div>
+
+          <div 
+            onClick={() => setMenuAtivo('lixeira')}
+            style={{ padding: '12px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'lixeira' ? '#1d3557' : 'transparent', display: 'flex', alignItems: 'center', gap: '10px', color: '#ff6b6b' }}
+          >
+            🗑️ {sidebarAberto && <span>Lixeira ({voosLixeira.length})</span>}
+          </div>
+        </div>
+
+        <div style={{ padding: '15px', borderTop: '1px solid #1c2541', textAlign: 'center' }}>
+          <button onClick={() => setSidebarAberto(!sidebarAberto)} style={{ background: 'transparent', border: 'none', color: '#8d99ae', cursor: 'pointer' }}>
+            {sidebarAberto ? '◀ Ocultar Menu' : '▶'}
+          </button>
+        </div>
       </div>
 
-      {loading && <p>A carregar dados da nuvem...</p>}
+      {/* Conteúdo Principal */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        
+        {/* Topbar */}
+        <div style={{ height: '70px', borderBottom: '1px solid #1c2541', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 30px', backgroundColor: '#070b19' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '20px' }}>FLIGHTOPS BSB</h2>
+            <small style={{ color: '#8d99ae' }}>POSTO CAN BR — BASE AÉREA DE BRASÍLIA (SBBR)</small>
+          </div>
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            <span style={{ backgroundColor: '#06d6a0', color: '#000', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>POSTO CAN BR OPERACIONAL</span>
+            <span style={{ backgroundColor: '#1d3557', padding: '6px 12px', borderRadius: '20px', fontSize: '12px' }}>CAIO (ADMIN) 👤</span>
+          </div>
+        </div>
 
-      {/* Tabela de Voos Ativos ou Lixeira */}
-      {!mostrarLixeira ? (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#007bff', color: '#white', textAlign: 'left' }}>
-              <th style={{ padding: '10px', color: '#fff' }}>Prefixo</th>
-              <th style={{ padding: '10px', color: '#fff' }}>Rota</th>
-              <th style={{ padding: '10px', color: '#fff' }}>Horário</th>
-              <th style={{ padding: '10px', color: '#fff' }}>Status</th>
-              <th style={{ padding: '10px', color: '#fff' }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {voos.length === 0 ? (
-              <tr><td colSpan="5" style={{ padding: '15px', textAlign: 'center' }}>Nenhum voo registado.</td></tr>
-            ) : (
-              voos.map(voo => (
-                <tr key={voo.id} style={{ borderBottom: '1px solid #ddd' }}>
-                  <td style={{ padding: '10px' }}>{voo.prefixo}</td>
-                  <td style={{ padding: '10px' }}>{voo.rota}</td>
-                  <td style={{ padding: '10px' }}>{voo.horario}</td>
-                  <td style={{ padding: '10px' }}>{voo.status}</td>
-                  <td style={{ padding: '10px' }}>
-                    <button 
-                      onClick={() => confirmarEExcluir(voo.id, voo.prefixo)}
-                      style={{ background: '#dc3545', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
-                      title="Excluir voo"
-                    >
-                      🗑️ Excluir
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff3f3' }}>
-          <thead>
-            <tr style={{ background: '#dc3545', color: '#fff', textAlign: 'left' }}>
-              <th style={{ padding: '10px' }}>Prefixo</th>
-              <th style={{ padding: '10px' }}>Rota</th>
-              <th style={{ padding: '10px' }}>Horário</th>
-              <th style={{ padding: '10px' }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lixeira.length === 0 ? (
-              <tr><td colSpan="4" style={{ padding: '15px', textAlign: 'center' }}>A lixeira está vazia.</td></tr>
-            ) : (
-              lixeira.map(voo => (
-                <tr key={voo.id} style={{ borderBottom: '1px solid #ddd' }}>
-                  <td style={{ padding: '10px' }}>{voo.prefixo}</td>
-                  <td style={{ padding: '10px' }}>{voo.rota}</td>
-                  <td style={{ padding: '10px' }}>{voo.horario}</td>
-                  <td style={{ padding: '10px' }}>
-                    <button 
-                      onClick={() => restaurarVoo(voo.id)}
-                      style={{ background: '#28a745', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}
-                    >
-                      ♻️ Restaurar
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      )}
+        {/* Área de Trabalho */}
+        <div style={{ padding: '30px', flex: 1, overflowY: 'auto' }}>
+          
+          {menuAtivo === 'painel' ? (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ margin: 0 }}>PAINEL DE REGISTO DE VOOS — POSTO CAN BR</h3>
+                <span style={{ color: '#8d99ae' }}>{voosAtivos.length} REGISTOS</span>
+              </div>
+
+              {voosAtivos.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '50px', color: '#8d99ae' }}>
+                  Nenhum voo registado na base de dados no momento.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                  {voosAtivos.map(voo => (
+                    <div key={voo.id} style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <h4 style={{ margin: 0, color: '#4cc9f0', fontSize: '18px' }}>{voo.prefixo}</h4>
+                          <small style={{ color: '#8d99ae' }}>ROTA: {voo.rota}</small>
+                        </div>
+                        <span style={{ backgroundColor: '#1d3557', color: '#4cc9f0', padding: '4px 8px', borderRadius: '6px', fontSize: '11px' }}>{voo.status || 'REGISTADO'}</span>
+                      </div>
+
+                      <div style={{ backgroundColor: '#0b132b', padding: '10px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                        <span>Horário: <strong>{voo.horario}</strong></span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #1c2541', paddingTop: '10px' }}>
+                        <small style={{ color: '#8d99ae' }}>Sincronizado Nuvem</small>
+                        <div style={{ display: 'flex', gap: '15px' }}>
+                          <button onClick={() => moverParaLixeira(voo.id, voo.prefixo)} style={{ background: 'none', border: 'none', color: '#ff6b6b', cursor: 'pointer', fontSize: '13px' }}>APAGAR</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ marginBottom: '20px' }}>
+                <h3 style={{ margin: 0, color: '#ff6b6b' }}>🗑️ LIXEIRA DE VOOS</h3>
+                <small style={{ color: '#8d99ae' }}>Voos movidos para a lixeira podem ser restaurados ou excluídos permanentemente.</small>
+              </div>
+
+              {voosLixeira.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '50px', color: '#8d99ae' }}>
+                  A lixeira está vazia.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                  {voosLixeira.map(voo => (
+                    <div key={voo.id} style={{ backgroundColor: '#111936', border: '1px solid #ff6b6b33', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                      <div>
+                        <h4 style={{ margin: 0, color: '#ff6b6b', fontSize: '18px' }}>{voo.prefixo}</h4>
+                        <small style={{ color: '#8d99ae' }}>ROTA: {voo.rota}</small>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #1c2541', paddingTop: '10px' }}>
+                        <button onClick={() => restaurarVoo(voo.id)} style={{ background: '#1d3557', border: 'none', color: '#4cc9f0', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>RESTAURAR</button>
+                        <button onClick={() => excluirDefinitivo(voo.id)} style={{ background: '#ff6b6b22', border: '1px solid #ff6b6b', color: '#ff6b6b', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>EXCLUIR DEFINITIVO</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+        </div>
+      </div>
     </div>
   );
 }

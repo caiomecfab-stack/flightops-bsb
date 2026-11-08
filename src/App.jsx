@@ -21,7 +21,7 @@ export default function App() {
     }
   }
 
-  // Enviar para a lixeira com confirmação explícita solicitada
+  // Enviar para a lixeira com confirmação explícita
   async function moverParaLixeira(id, prefixo) {
     const confirmar = window.confirm(`Deseja realmente excluir o voo ${prefixo || ''}?`);
     if (!confirmar) return;

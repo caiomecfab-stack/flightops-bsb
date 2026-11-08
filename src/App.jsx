@@ -61,6 +61,7 @@ const fmtTs = (ts) => {
 const DIAS = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
 const diaSemana = (iso) => (iso ? DIAS[new Date(iso + 'T12:00:00').getDay()] : '');
 
+// Aceita 1330, 13:30, 930...
 const normHora = (v) => {
   const d = String(v || '').replace(/\D/g, '');
   if (!d) return '';
@@ -77,10 +78,16 @@ const intervalo = (ini, fim) => {
   const b = minutos(fim);
   if (a === null || b === null) return null;
   let d = b - a;
-  if (d < 0) d += 1440;
+  if (d < 0) d += 1440; // passou da meia-noite
   return d;
 };
 
+/* ---------------------------------------------------------------
+   ÍNDICE DE EFETIVIDADE
+   = (tempo entre CHAMADA e DECOLAGEM prevista)
+     ÷ (tempo entre CHAMADA e HORA REAL de atendimento) × 100
+   Para trocar a fórmula, altere somente esta função.
+   --------------------------------------------------------------- */
 const calcEfetividade = (chamada, decolagem, real) => {
   const previsto = intervalo(chamada, decolagem);
   const executado = intervalo(chamada, real);
@@ -97,6 +104,9 @@ const hashSenha = async (nome, senha) => {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 };
 
+/* ---------------------------------------------------------------
+   CRUZAMENTO DE LISTAS (ignora patentes)
+   --------------------------------------------------------------- */
 const PATENTES = new Set([
   'SD', 'CB', '3S', '2S', '1S', 'SO', 'SGT', 'ST', 'ASP', 'AP', '2T', '1T', 'TEN', 'CAP', 'MAJ',
   'TC', 'CEL', 'BRIG', 'MBRIG', 'TBRIG', 'MAREC', 'GEN', 'CMG', 'CF', 'CC', 'CT', 'MN', 'SUB',
@@ -128,6 +138,9 @@ const cruzar = (txtPrevisto, txtReal) => {
   };
 };
 
+/* ---------------------------------------------------------------
+   FILTROS
+   --------------------------------------------------------------- */
 const FILTRO_VAZIO = { aeronave: '', inicial: '', final: '', data: '', mes: '', local: '', desemb: '' };
 const codigosRota = (rota) => (rota || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 
@@ -146,6 +159,9 @@ const filtrarVoos = (lista, f) =>
 
 const somar = (lista, campo) => lista.reduce((s, v) => s + (Number(v[campo]) || 0), 0);
 
+/* ================================================================
+   COMPONENTES PEQUENOS
+   ================================================================ */
 function Campo({ rotulo, children, className = '' }) {
   return (
     <div className={className}>
@@ -338,6 +354,9 @@ function Modal({ dados, onCancelar, onConfirmar }) {
   );
 }
 
+/* ================================================================
+   TELAS
+   ================================================================ */
 function TelaConfig() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050a16] p-6 text-slate-200">
@@ -720,416 +739,733 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
 
 function TelaDesembarque({ voos, aeronaves, onSalvar, avisar }) {
   const [f, setF] = useState(FILTRO_VAZIO);
-  const [vooId, setVooId] = useState('');
-  const [qtd, setQtd] = useState('');
-  const [obs, setObs] = useState('');
+  const [sel, setSel] = useState({});
+  const [qtds, setQtds] = useState({});
   const [salvando, setSalvando] = useState(false);
+  const lista = useMemo(() => filtrarVoos(voos, f), [voos, f]);
+  const valor = (v) => qtds[v.id] ?? String(v.desembarcados ?? 0);
 
-  const filtrados = useMemo(() => filtrarVoos(voos, f), [voos, f]);
-  const selecionado = useMemo(() => voos.find((v) => v.id === vooId), [voos, vooId]);
+  const todos = () => {
+    const tudo = lista.length > 0 && lista.every((v) => sel[v.id]);
+    const n = { ...sel };
+    lista.forEach((v) => (n[v.id] = !tudo));
+    setSel(n);
+  };
 
-  useEffect(() => {
-    if (selecionado) {
-      setQtd(String(selecionado.desembarcados ?? ''));
-      setObs(selecionado.obs_desembarque || '');
-    } else {
-      setQtd('');
-      setObs('');
+  const guardar = async () => {
+    const escolhidos = lista.filter((v) => sel[v.id]);
+    if (!escolhidos.length) return avisar('Selecione ao menos um voo.', 'erro');
+    const mapa = {};
+    for (const v of escolhidos) {
+      const q = Number(valor(v)) || 0;
+      if (q < 0 || (v.pax > 0 && q > v.pax)) {
+        return avisar(`Desembarque inválido em ${v.aeronave} (${fmtData(v.data_voo)}): máximo ${v.pax}.`, 'erro');
+      }
+      mapa[v.id] = q;
     }
-  }, [selecionado]);
-
-  const enviar = async (e) => {
-    e.preventDefault();
-    if (!vooId) return avisar('Selecione um voo.', 'erro');
     setSalvando(true);
-    await onSalvar(vooId, {
-      desembarcados: Number(qtd) || 0,
-      obs_desembarque: obs.trim()
-    });
+    const ok = await onSalvar(mapa);
     setSalvando(false);
+    if (ok) {
+      setSel({});
+      setQtds({});
+    }
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <form onSubmit={enviar} className={`${C.painel} space-y-4 p-6`}>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className={`${C.painel} space-y-4 p-5`}>
         <div className={C.titulo}>
-          <UserCheck size={16} /> Registo de desembarque — Posto CAN BR
+          <UserCheck size={15} /> Gestão e filtro de desembarque — múltiplos voos
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <p className="text-[11px] text-slate-400">
+          Filtre por aeronave, data inicial, data final, data específica ou mês/ano, selecione múltiplos voos e indique o
+          total de passageiros desembarcados.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <CamposFiltro f={f} setF={setF} aeronaves={aeronaves} />
         </div>
-        <Campo rotulo="Selecionar voo">
-          <select className={C.input} value={vooId} onChange={(e) => setVooId(e.target.value)} required>
-            <option value="">SELECIONE O VOO</option>
-            {filtrados.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.data_voo} | {v.aeronave} ({v.rota || 'Sem rota'}) - PAX: {v.pax}
-              </option>
+      </div>
+
+      <div className={`${C.painel} space-y-5 p-5`}>
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <span className="text-xs font-bold uppercase text-sky-400">Voos encontrados para desembarque ({lista.length})</span>
+          <button onClick={todos} className="text-[11px] font-bold uppercase text-white underline">Selecionar todos</button>
+        </div>
+        {lista.length === 0 && <p className="py-6 text-center text-xs uppercase text-slate-500">Nenhum voo encontrado.</p>}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {lista.map((v) => (
+            <div key={v.id} className={`${C.caixa} space-y-3 p-4`}>
+              <div className="flex items-start gap-3">
+                <input type="checkbox" className="mt-1 h-4 w-4" checked={!!sel[v.id]} onChange={() => setSel((s) => ({ ...s, [v.id]: !s[v.id] }))} />
+                <div className="flex-1">
+                  <div className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</div>
+                  <div className="text-[11px] uppercase text-slate-400">
+                    Data: <b className="font-mono text-white">{v.data_voo}</b> · Pax: <b className="font-mono text-white">{v.pax}</b>
+                  </div>
+                </div>
+                <span className="rounded-md border border-sky-900 bg-sky-950/40 px-2 py-1 text-[10px] font-bold uppercase text-sky-300">
+                  {diaSemana(v.data_voo)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#0c1424] px-3 py-2">
+                <span className="flex items-center gap-2 text-[11px] font-bold uppercase text-sky-400">
+                  <UserCheck size={13} /> Qtd desembarcados:
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  className="w-24 rounded-lg border border-slate-700 bg-[#050a16] px-2 py-2 text-center font-mono text-xs text-white focus:border-sky-500 focus:outline-none"
+                  value={valor(v)}
+                  onChange={(e) => {
+                    setQtds((q) => ({ ...q, [v.id]: e.target.value }));
+                    setSel((s) => ({ ...s, [v.id]: true }));
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={guardar} disabled={salvando} className={`${C.botao} w-full py-4`}>
+          {salvando ? 'A guardar…' : 'Guardar desembarque para os voos selecionados'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TelaAeronaves({ aeronaves, onAdicionar, onRemover }) {
+  const [modelo, setModelo] = useState('');
+  const enviar = async (e) => {
+    e.preventDefault();
+    if (!modelo.trim()) return;
+    const ok = await onAdicionar(modelo.trim().toUpperCase());
+    if (ok) setModelo('');
+  };
+  return (
+    <div className={`${C.painel} mx-auto max-w-xl space-y-5 p-6`}>
+      <div className={C.titulo}>
+        <Plane size={15} /> Registar e gerir aeronaves FAB
+      </div>
+      <form onSubmit={enviar} className="space-y-4">
+        <Campo rotulo="Modelo da aeronave">
+          <input className={C.input} value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="EX: C-130 HÉRCULES" required />
+        </Campo>
+        <button type="submit" className={`${C.botao} w-full`}>Adicionar aeronave</button>
+      </form>
+      <div className="space-y-2 border-t border-slate-800 pt-5">
+        <h3 className="text-xs font-bold uppercase text-white">Aeronaves registradas:</h3>
+        {aeronaves.map((a) => (
+          <div key={a.id} className={`${C.caixa} flex items-center justify-between px-3 py-3`}>
+            <span className="font-mono text-xs font-bold uppercase text-sky-300">{a.modelo}</span>
+            <div className="flex items-center gap-3">
+              <ShieldCheck size={15} className="text-emerald-400" />
+              <button onClick={() => onRemover(a)} className="text-rose-400 hover:text-rose-300" title="Remover">
+                <Trash2 size={15} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TelaRelatorio({ voos, aeronaves }) {
+  const [f, setF] = useState(FILTRO_VAZIO);
+  const lista = useMemo(() => filtrarVoos(voos, f), [voos, f]);
+
+  const relatorio = (
+    <div className="rounded-2xl bg-white p-8 text-slate-900 print:rounded-none print:p-0">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-900 pb-4">
+        <div>
+          <h2 className="text-2xl font-extrabold uppercase">Comando da Aeronáutica</h2>
+          <p className="text-sm font-bold uppercase">Base Aérea de Brasília — Posto CAN BR</p>
+          <p className="text-xs uppercase text-slate-500">Relatório operacional de voos</p>
+        </div>
+        <div className="text-right font-mono text-[11px] uppercase text-slate-500">
+          <div>Emitido em: {fmtData(hoje())}</div>
+          <div>Total de registos: {lista.length}</div>
+        </div>
+      </div>
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[640px] text-left text-xs">
+          <thead>
+            <tr className="bg-[#0c1424] text-[10px] uppercase text-white">
+              {['Data / Dia', 'Aeronave / Matr.', 'Rota', 'Pax', 'Desembarcados', 'Peso total', 'Efetividade'].map((h) => (
+                <th key={h} className="px-3 py-3">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((v) => (
+              <tr key={v.id} className="border-b border-slate-200">
+                <td className="px-3 py-3 font-mono">
+                  {v.data_voo}
+                  <div className="text-[9px] uppercase text-slate-500">{diaSemana(v.data_voo)}</div>
+                </td>
+                <td className="px-3 py-3 font-bold uppercase">
+                  {v.aeronave}{v.matricula ? ` (${v.matricula})` : ''}
+                </td>
+                <td className="px-3 py-3 font-mono">{v.rota}</td>
+                <td className="px-3 py-3 font-mono font-bold">{v.pax}</td>
+                <td className="px-3 py-3 font-mono">{v.desembarcados}</td>
+                <td className="px-3 py-3 font-mono font-bold">{v.total_peso} KG</td>
+                <td className="px-3 py-3 font-mono font-bold text-emerald-700">
+                  {fmtEf(calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real))}
+                </td>
+              </tr>
             ))}
+            {lista.length > 0 && (
+              <tr className="bg-slate-100 font-bold">
+                <td className="px-3 py-3 uppercase" colSpan="3">Total</td>
+                <td className="px-3 py-3 font-mono">{somar(lista, 'pax')}</td>
+                <td className="px-3 py-3 font-mono">{somar(lista, 'desembarcados')}</td>
+                <td className="px-3 py-3 font-mono">{somar(lista, 'total_peso')} KG</td>
+                <td />
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-16 flex items-end justify-between border-t border-slate-300 pt-4 text-[11px] uppercase">
+        <div>
+          <div className="mb-1 w-64 border-b border-slate-900" />
+          <b>Chefe do Posto CAN BR (SBBR)</b>
+        </div>
+        <span className="text-slate-500">Sistema FlightOps BSB — Controlo operacional</span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className={`${C.painel} space-y-4 p-5`}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className={C.titulo}>
+            <Printer size={15} /> Gerador e impressão de relatório — Posto CAN BR
+          </div>
+          <button onClick={() => window.print()} className={`${C.botao} flex items-center gap-2`}>
+            <Printer size={14} /> Imprimir / Exportar PDF
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <CamposFiltro
+            f={f}
+            setF={setF}
+            aeronaves={aeronaves}
+            comMes={false}
+            rotulos={{ inicial: 'Data inicial (período)', final: 'Data final (período)', data: 'Data específica (dia comum)' }}
+          />
+        </div>
+      </div>
+      {relatorio}
+      {createPortal(<div className="print-only">{relatorio}</div>, document.body)}
+    </div>
+  );
+}
+
+function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover }) {
+  const [novaSenha, setNovaSenha] = useState('');
+  const [nome, setNome] = useState('');
+  const [senha, setSenha] = useState('');
+  const [perfil, setPerfil] = useState('operador');
+
+  const trocar = async () => {
+    if (await onSenha(novaSenha)) setNovaSenha('');
+  };
+  const criar = async (e) => {
+    e.preventDefault();
+    if (await onCriar(nome, senha, perfil)) {
+      setNome('');
+      setSenha('');
+      setPerfil('operador');
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-xl space-y-6">
+      <div className={`${C.painel} space-y-4 p-6`}>
+        <div className={C.titulo}>
+          <KeyRound size={15} /> Segurança e senha do administrador {usuario.nome}
+        </div>
+        <Campo rotulo={`Nova senha para o administrador ${usuario.nome}`}>
+          <input type="password" className={C.input} value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="DIGITE A NOVA SENHA" />
+        </Campo>
+        <button onClick={trocar} className={`${C.botao} w-full`}>Atualizar senha do administrador</button>
+      </div>
+
+      <form onSubmit={criar} className={`${C.painel} space-y-4 p-6`}>
+        <div className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-400">
+          <UserPlus size={15} /> Cadastrar novo utilizador / operador
+        </div>
+        <Campo rotulo="Nome do utilizador">
+          <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: 2S OLIVEIRA" required />
+        </Campo>
+        <Campo rotulo="Senha de acesso">
+          <input type="password" className={C.input} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="MÍNIMO 6 CARACTERES" required />
+        </Campo>
+        <Campo rotulo="Perfil (operador ou administrador)">
+          <select className={C.input} value={perfil} onChange={(e) => setPerfil(e.target.value)}>
+            <option value="operador">OPERADOR</option>
+            <option value="admin">ADMINISTRADOR</option>
           </select>
         </Campo>
-        {selecionado && (
-          <div className={`${C.caixa} grid grid-cols-3 gap-2 p-3 text-center`}>
-            <Caixa rotulo="Pax previstos" valor={selecionado.pax} />
-            <Caixa rotulo="Embarcados" valor={selecionado.embarcados} />
-            <Caixa rotulo="Destino" valor={selecionado.rota} />
-          </div>
-        )}
-        <Campo rotulo="Quantidade de desembarcados em BSB">
-          <input type="number" min="0" className={C.input} value={qtd} onChange={(e) => setQtd(e.target.value)} placeholder="0" required />
-        </Campo>
-        <Campo rotulo="Observações de desembarque">
-          <textarea rows="3" className={C.input} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex: Passageiros em trânsito para hotel de trânsito..." />
-        </Campo>
-        <button type="submit" disabled={salvando} className={`${C.botao} w-full`}>
-          {salvando ? 'A guardar…' : 'Registar desembarque'}
+        <button type="submit" className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-bold uppercase text-white hover:bg-emerald-500">
+          Cadastrar utilizador
         </button>
+        <div className="space-y-2 border-t border-slate-800 pt-4">
+          <h3 className="text-xs font-bold uppercase text-white">Utilizadores cadastrados:</h3>
+          {usuarios.map((u) => (
+            <div key={u.id} className={`${C.caixa} flex items-center justify-between px-3 py-3`}>
+              <span className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</span>
+              <div className="flex items-center gap-3">
+                <span className="rounded border border-sky-800 bg-sky-950/50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300">
+                  {u.perfil === 'admin' ? 'Admin' : 'Operador'}
+                </span>
+                {u.id !== usuario.id && (
+                  <button type="button" onClick={() => onRemover(u)} className="text-rose-400 hover:text-rose-300" title="Remover">
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </form>
     </div>
   );
 }
 
-function TelaRelatorios({ voos, aeronaves }) {
-  const [f, setF] = useState(FILTRO_VAZIO);
-  const filtrados = useMemo(() => filtrarVoos(voos, f), [voos, f]);
-
+function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
   return (
     <div className="space-y-6">
-      <div className={`${C.painel} space-y-4 p-5 print:hidden`}>
-        <div className={C.titulo}>
-          <Printer size={15} /> Relatórios operacionais — Posto CAN BR
+      <div className={`${C.painel} flex items-center justify-between px-5 py-4`}>
+        <div className="flex items-center gap-2 text-xs font-bold uppercase text-rose-400">
+          <Trash2 size={15} /> Lixeira — voos excluídos
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <CamposFiltro f={f} setF={setF} aeronaves={aeronaves} />
-        </div>
-        <div className="flex justify-end pt-2">
-          <button onClick={() => window.print()} className={`${C.botao} flex items-center gap-2`}>
-            <Printer size={14} /> Imprimir / Gerar PDF
-          </button>
-        </div>
+        <span className="font-mono text-[11px] uppercase text-slate-400">{voos.length} registos</span>
       </div>
-
-      <div className={`${C.painel} space-y-6 p-8 text-slate-100 print:border-none print:bg-white print:text-black print:p-0`}>
-        <div className="border-b border-slate-800 pb-4 print:border-black">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-base font-extrabold uppercase print:text-black">Posto CAN BR — Base Aérea de Brasília</h1>
-              <p className="text-xs uppercase text-slate-400 print:text-gray-600">Relatório Consolidado de Tráfego Aéreo</p>
-            </div>
-            <div className="text-right font-mono text-xs text-slate-400 print:text-gray-600">
-              Gerado em: {fmtTs(new Date().toISOString())}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 print:grid-cols-4">
-          <div className="rounded-xl border border-slate-800 bg-[#050a16] p-4 text-center print:border-gray-300 print:bg-gray-50">
-            <div className="text-[10px] uppercase text-slate-400 print:text-gray-600">Total de voos</div>
-            <div className="font-mono text-xl font-bold text-sky-400 print:text-black">{filtrados.length}</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-[#050a16] p-4 text-center print:border-gray-300 print:bg-gray-50">
-            <div className="text-[10px] uppercase text-slate-400 print:text-gray-600">Total PAX</div>
-            <div className="font-mono text-xl font-bold text-emerald-400 print:text-black">{somar(filtrados, 'pax')}</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-[#050a16] p-4 text-center print:border-gray-300 print:bg-gray-50">
-            <div className="text-[10px] uppercase text-slate-400 print:text-gray-600">Peso Total</div>
-            <div className="font-mono text-xl font-bold text-indigo-400 print:text-black">{somar(filtrados, 'total_peso')} KG</div>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-[#050a16] p-4 text-center print:border-gray-300 print:bg-gray-50">
-            <div className="text-[10px] uppercase text-slate-400 print:text-gray-600">Bagagens</div>
-            <div className="font-mono text-xl font-bold text-amber-400 print:text-black">{somar(filtrados, 'qtd_bagagens')}</div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 text-[10px] uppercase text-slate-400 print:border-black print:text-black">
-                {['Data', 'Aeronave', 'Matr.', 'Rota', 'Chamada', 'Decolagem', 'Real', 'Pax', 'Peso (kg)'].map((h) => (
-                  <th key={h} className="px-2 py-2">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="font-mono print:text-black">
-              {filtrados.length === 0 ? (
-                <tr><td colSpan="9" className="px-2 py-6 text-center text-slate-500">Nenhum registo para os filtros selecionados.</td></tr>
-              ) : (
-                filtrados.map((v) => (
-                  <tr key={v.id} className="border-b border-slate-800/60 print:border-gray-300">
-                    <td className="px-2 py-2">{fmtData(v.data_voo)}</td>
-                    <td className="px-2 py-2 font-bold">{v.aeronave}</td>
-                    <td className="px-2 py-2">{v.matricula || '—'}</td>
-                    <td className="px-2 py-2">{v.rota || '—'}</td>
-                    <td className="px-2 py-2">{v.hora_chamada || '--:--'}</td>
-                    <td className="px-2 py-2">{v.hora_decolagem || '--:--'}</td>
-                    <td className="px-2 py-2">{v.hora_real || '--:--'}</td>
-                    <td className="px-2 py-2">{v.pax}</td>
-                    <td className="px-2 py-2">{v.total_peso}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TelaUtilizadores({ usuarios, aeronaves, onSalvarUsuario, onApagarUsuario, onSalvarAeronave, onApagarAeronave, usuarioAtual, avisar }) {
-  const [nome, setNome] = useState('');
-  const [senha, setSenha] = useState('');
-  const [perfil, setPerfil] = useState('user');
-  const [novaAero, setNovaAero] = useState('');
-  const [salvandoU, setSalvandoU] = useState(false);
-  const [salvandoA, setSalvandoA] = useState(false);
-
-  const criarUsuario = async (e) => {
-    e.preventDefault();
-    if (!nome.trim() || !senha) return avisar('Preencha utilizador e senha.', 'erro');
-    setSalvandoU(true);
-    await onSalvarUsuario(nome.trim(), senha, perfil);
-    setNome('');
-    setSenha('');
-    setSalvandoU(false);
-  };
-
-  const criarAeronave = async (e) => {
-    e.preventDefault();
-    if (!novaAero.trim()) return avisar('Digite o modelo da aeronave.', 'erro');
-    setSalvandoA(true);
-    await onSalvarAeronave(novaAero.trim());
-    setNovaAero('');
-    setSalvandoA(false);
-  };
-
-  return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className={`${C.painel} space-y-6 p-6`}>
-        <div className={C.titulo}>
-          <Users size={16} /> Gestão de utilizadores
-        </div>
-        <form onSubmit={criarUsuario} className="space-y-4 border-b border-slate-800 pb-6">
-          <Campo rotulo="Novo utilizador (login)">
-            <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: SGT SILVA" autoCapitalize="characters" required />
-          </Campo>
-          <Campo rotulo="Senha de acesso">
-            <input type="password" className={C.input} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••••" required />
-          </Campo>
-          <Campo rotulo="Perfil de acesso">
-            <select className={C.input} value={perfil} onChange={(e) => setPerfil(e.target.value)}>
-              <option value="user">Operador (Padrão)</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </Campo>
-          <button type="submit" disabled={salvandoU} className={`${C.botao} w-full`}>
-            {salvandoU ? 'A criar…' : 'Criar utilizador'}
-          </button>
-        </form>
-
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold uppercase text-slate-300">Utilizadores registados</h3>
-          <div className="space-y-2">
-            {usuarios.map((u) => (
-              <div key={u.id} className={`${C.caixa} flex items-center justify-between p-3`}>
+      {voos.length === 0 ? (
+        <p className="py-10 text-center text-xs uppercase text-slate-500">A lixeira está vazia.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          {voos.map((v) => (
+            <div key={v.id} className={`${C.painel} space-y-4 p-5`}>
+              <div className="flex items-start justify-between">
                 <div>
-                  <span className="font-bold uppercase text-white">{u.login}</span>
-                  <span className="ml-2 rounded bg-slate-800 px-2 py-0.5 text-[10px] uppercase text-sky-400">
-                    {u.perfil === 'admin' ? 'Administrador' : 'Operador'}
-                  </span>
+                  <h3 className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</h3>
+                  <p className="mt-1 text-[11px] uppercase text-slate-400">
+                    Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
+                  </p>
                 </div>
-                {u.login !== 'CAIO' && u.login !== usuarioAtual.login && (
-                  <button onClick={() => onApagarUsuario(u.id)} className="text-rose-400 hover:text-rose-300">
-                    <Trash2 size={15} />
-                  </button>
-                )}
+                <div className="text-right">
+                  <span className="rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">{v.rota || '—'}</span>
+                  <p className="mt-1 font-mono text-[10px] text-slate-500">{v.data_voo}</p>
+                </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className={`${C.painel} space-y-6 p-6`}>
-        <div className={C.titulo}>
-          <Plane size={16} /> Gestão de aeronaves FAB
-        </div>
-        <form onSubmit={criarAeronave} className="space-y-4 border-b border-slate-800 pb-6">
-          <Campo rotulo="Modelo da aeronave">
-            <input className={C.input} value={novaAero} onChange={(e) => setNovaAero(e.target.value)} placeholder="EX: C-130 HERCULES" autoCapitalize="characters" required />
-          </Campo>
-          <button type="submit" disabled={salvandoA} className={`${C.botao} w-full`}>
-            {salvandoA ? 'A adicionar…' : 'Adicionar aeronave'}
-          </button>
-        </form>
-
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold uppercase text-slate-300">Aeronaves disponíveis</h3>
-          <div className="space-y-2">
-            {aeronaves.map((a) => (
-              <div key={a.id} className={`${C.caixa} flex items-center justify-between p-3`}>
-                <span className="font-bold uppercase text-sky-400">{a.modelo}</span>
-                <button onClick={() => onApagarAeronave(a.id)} className="text-rose-400 hover:text-rose-300">
-                  <Trash2 size={15} />
+              <div className="grid grid-cols-3 gap-2">
+                <Caixa rotulo="Pax" valor={v.pax} />
+                <Caixa rotulo="Total" valor={`${v.total_peso} KG`} destaque />
+                <Caixa rotulo="Desemb." valor={v.desembarcados} />
+              </div>
+              <div className="rounded-lg border border-rose-900/60 bg-rose-950/20 px-3 py-2 text-[11px] uppercase text-rose-300">
+                Excluído por <b className="font-mono text-white">{v.excluido_por || '—'}</b>{' '}
+                <span className="font-mono">({fmtTs(v.excluido_em)})</span>
+              </div>
+              <div className="flex items-center justify-end gap-5 border-t border-slate-800 pt-3 text-[11px] font-bold uppercase">
+                <button onClick={() => onRestaurar(v)} className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300">
+                  <RotateCcw size={13} /> Restaurar
+                </button>
+                <button onClick={() => onExcluirDef(v)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
+                  <Trash2 size={13} /> Excluir definitivamente
                 </button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
+/* ================================================================
+   APLICATIVO PRINCIPAL
+   ================================================================ */
+const MENU = [
+  { id: 'dashboard', rotulo: 'Dashboard', Icone: BarChart3 },
+  { id: 'voos', rotulo: 'Painel de Voos', Icone: Database },
+  { id: 'adicionar', rotulo: 'Adicionar Voo', Icone: PlusCircle },
+  { id: 'desembarque', rotulo: 'Desembarque', Icone: UserCheck },
+  { id: 'aeronaves', rotulo: 'Adicionar Aeronave', Icone: Plane },
+  { id: 'relatorio', rotulo: 'Imprimir Relatório', Icone: Printer },
+  { id: 'usuarios', rotulo: 'Utilizadores', Icone: Users, admin: true },
+  { id: 'lixeira', rotulo: 'Lixeira', Icone: Trash2, admin: true }
+];
+
 export default function App() {
-  const [configurado, setConfigurado] = useState(supabaseConfigurado);
-  const [online, setOnline] = useState(true);
-  const [usuario, setUsuario] = useState(() => lerLocal('flightops_usuario', null));
-  const [tela, setTela] = useState('dashboard');
+  const [usuario, setUsuario] = useState(() => lerLocal('flightops_sessao', null));
+  const [aba, setAba] = useState('dashboard');
+  const [menuAberto, setMenuAberto] = useState(() => window.innerWidth >= 1024);
   const [voos, setVoos] = useState([]);
   const [aeronaves, setAeronaves] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
-  const [editando, setEditando] = useState(null);
-  const [modal, setModal] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [menuMob, setMenuMob] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [online, setOnline] = useState(false);
+  const [vooEditando, setVooEditando] = useState(null);
+  const [aviso, setAviso] = useState(null);
+  const [confirmacao, setConfirmacao] = useState(null);
+  const timerAviso = useRef(null);
+  const bootstrapFeito = useRef(false);
 
-  const avisar = (txt, tipo = 'sucesso') => {
-    setToast({ txt, tipo });
-    setTimeout(() => setToast(null), 4000);
-  };
+  const avisar = useCallback((texto, tipo = 'ok') => {
+    setAviso({ texto, tipo });
+    clearTimeout(timerAviso.current);
+    timerAviso.current = setTimeout(() => setAviso(null), 4000);
+  }, []);
 
-  const carregarDados = useCallback(async () => {
-    if (!configurado) return;
+  /* ---------- carregar dados + sincronização em tempo real ---------- */
+  const carregarTudo = useCallback(async () => {
+    if (!supabase) return;
     try {
-      setOnline(true);
-      const [{ data: v }, { data: a }, { data: u }] = await Promise.all([
-        supabase.from('voos').select('*').order('data_voo', { ascending: false }),
+      const [v, a, u] = await Promise.all([
+        supabase.from('voos').select('*').order('data_voo', { ascending: false }).order('criado_em', { ascending: false }),
         supabase.from('aeronaves').select('*').order('modelo'),
-        supabase.from('usuarios').select('*').order('login')
+        supabase.from('usuarios').select('id,nome,perfil,criado_em').order('nome')
       ]);
-      if (v) setVoos(v);
-      if (a) setAeronaves(a);
-      if (u) setUsuarios(u);
+      if (v.error || a.error || u.error) {
+        setOnline(false);
+        return;
+      }
+      setVoos(v.data);
+      setAeronaves(a.data);
+      setUsuarios(u.data);
+      setOnline(true);
+      setCarregando(false);
     } catch {
       setOnline(false);
-      avisar('Erro ao ligar ao servidor Supabase.', 'erro');
     }
-  }, [configurado]);
+  }, []);
 
   useEffect(() => {
-    if (!configurado) return;
-    carregarDados();
-
+    if (!supabase) return undefined;
+    carregarTudo();
     const canal = supabase
-      .channel('mudancas-globais')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => {
-        carregarDados();
-      })
+      .channel('flightops-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'voos' }, carregarTudo)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'aeronaves' }, carregarTudo)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, carregarTudo)
       .subscribe();
-
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') carregarTudo();
+    };
+    document.addEventListener('visibilitychange', aoVoltar);
+    window.addEventListener('online', carregarTudo);
+    const timer = setInterval(carregarTudo, 30000); // rede de segurança
     return () => {
       supabase.removeChannel(canal);
+      document.removeEventListener('visibilitychange', aoVoltar);
+      window.removeEventListener('online', carregarTudo);
+      clearInterval(timer);
     };
-  }, [configurado, carregarDados]);
+  }, [carregarTudo]);
 
-  const entrar = async (loginTxt, senhaTxt) => {
-    const l = loginTxt.trim().toUpperCase();
-    if (!l || !senhaTxt) return 'Preencha utilizador e senha.';
-    try {
-      const hash = await hashSenha(l, senhaTxt);
-      const { data, error } = await supabase.from('usuarios').select('*').eq('login', l).eq('senha', hash).single();
-      if (error || !data) return 'Utilizador ou senha incorretos.';
-      setUsuario(data);
-      gravarLocal('flightops_usuario', data);
-      avisar(`Bem-vindo, ${data.login}!`);
-      return null;
-    } catch {
-      return 'Erro ao autenticar. Verifique a ligação.';
-    }
-  };
+  /* ---------- cria o administrador CAIO no primeiro uso ---------- */
+  useEffect(() => {
+    if (!supabase || carregando || usuarios.length > 0 || bootstrapFeito.current) return;
+    bootstrapFeito.current = true;
+    (async () => {
+      const senha_hash = await hashSenha('CAIO', 'admin123');
+      await supabase.from('usuarios').insert({ nome: 'CAIO', senha_hash, perfil: 'admin' });
+      carregarTudo();
+    })();
+  }, [carregando, usuarios.length, carregarTudo]);
 
-  const sair = () => {
+  const sair = useCallback(() => {
     setUsuario(null);
-    gravarLocal('flightops_usuario', null);
-    setTela('dashboard');
-    avisar('Sessão encerrada.');
-  };
+    gravarLocal('flightops_sessao', null);
+    setAba('dashboard');
+  }, []);
 
-  const salvarVoo = async (dadosVoo, id) => {
-    const payload = {
-      ...dadosVoo,
-      ultima_alt_por: usuario?.login || 'SISTEMA',
-      ultima_alt_em: new Date().toISOString()
-    };
-    if (id) {
-      const { error } = await supabase.from('voos').update(payload).eq('id', id);
-      if (error) return avisar('Erro ao atualizar voo.', 'erro');
-      avisar('Voo atualizado com sucesso!');
-      setEditando(null);
-    } else {
-      const { error } = await supabase.from('voos').insert([payload]);
-      if (error) return avisar('Erro ao registar voo.', 'erro');
-      avisar('Voo registado com sucesso!');
+  // Se o utilizador logado foi removido, encerra a sessão
+  useEffect(() => {
+    if (usuario && !carregando && usuarios.length > 0 && !usuarios.some((u) => u.id === usuario.id)) sair();
+  }, [usuario, usuarios, carregando, sair]);
+
+  const ativos = useMemo(() => voos.filter((v) => !v.excluido), [voos]);
+  const lixeira = useMemo(() => voos.filter((v) => v.excluido), [voos]);
+  const ehAdmin = usuario?.perfil === 'admin';
+
+  /* ---------- ações ---------- */
+  const gravar = async (consulta, msgOk) => {
+    const { error } = await consulta;
+    if (error) {
+      avisar(error.code === '23505' ? 'Já existe um registo com esse nome.' : `Erro: ${error.message}`, 'erro');
+      return false;
     }
-    setTela('painel');
-    carregarDados();
+    if (msgOk) avisar(msgOk);
+    await carregarTudo();
+    return true;
+  };
+  const carimbo = () => ({ ultima_alt_por: usuario.nome, ultima_alt_em: new Date().toISOString() });
+
+  const entrar = async (nome, senha) => {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('id,nome,perfil,senha_hash')
+      .eq('nome', nome.trim().toUpperCase())
+      .maybeSingle();
+    if (error) return 'Falha de ligação ao servidor. Tente novamente.';
+    if (!data) return 'Utilizador ou senha inválidos.';
+    if ((await hashSenha(nome, senha)) !== data.senha_hash) return 'Utilizador ou senha inválidos.';
+    const sessao = { id: data.id, nome: data.nome, perfil: data.perfil };
+    setUsuario(sessao);
+    gravarLocal('flightops_sessao', sessao);
+    return null;
   };
 
-  const salvarDesembarque = async (id, dadosDesemb) => {
-    const payload = {
-      ...dadosDesemb,
-      ultima_alt_por: usuario?.login || 'SISTEMA',
-      ultima_alt_em: new Date().toISOString()
-    };
-    const { error } = await supabase.from('voos').update(payload).eq('id', id);
-    if (error) return avisar('Erro ao registar desembarque.', 'erro');
-    avisar('Desembarque registado com sucesso!');
-    setTela('painel');
-    carregarDados();
+  const salvarVoo = async (dados, id) => {
+    const payload = { ...dados, ...carimbo() };
+    const ok = await gravar(
+      id ? supabase.from('voos').update(payload).eq('id', id) : supabase.from('voos').insert(payload),
+      id ? 'Voo atualizado.' : 'Voo guardado.'
+    );
+    if (ok) {
+      setVooEditando(null);
+      setAba('voos');
+    }
   };
 
-  const apagarVooConfirmado = async (v) => {
-    const { error } = await supabase.from('voos').delete().eq('id', v.id);
-    if (error) return avisar('Erro ao apagar voo.', 'erro');
-    avisar('Voo apagado com sucesso!');
-    setModal(null);
-    carregarDados();
+  const pedirExclusao = (v) =>
+    setConfirmacao({
+      titulo: 'Excluir voo?',
+      texto: `Deseja realmente excluir o voo ${v.aeronave} de ${fmtData(v.data_voo)}? Ele será movido para a Lixeira e poderá ser restaurado por um administrador.`,
+      botao: 'Sim, excluir',
+      aoConfirmar: () =>
+        gravar(
+          supabase.from('voos').update({ excluido: true, excluido_em: new Date().toISOString(), excluido_por: usuario.nome }).eq('id', v.id),
+          'Voo movido para a Lixeira.'
+        )
+    });
+
+  const restaurarVoo = (v) =>
+    gravar(
+      supabase.from('voos').update({ excluido: false, excluido_em: null, excluido_por: null, ...carimbo() }).eq('id', v.id),
+      'Voo restaurado.'
+    );
+
+  const pedirExclusaoDefinitiva = (v) =>
+    setConfirmacao({
+      titulo: 'Excluir definitivamente?',
+      texto: `O voo ${v.aeronave} de ${fmtData(v.data_voo)} será apagado para sempre. Esta ação não pode ser desfeita.`,
+      botao: 'Excluir definitivamente',
+      aoConfirmar: () => gravar(supabase.from('voos').delete().eq('id', v.id), 'Voo excluído definitivamente.')
+    });
+
+  const salvarDesembarque = async (mapa) => {
+    const res = await Promise.all(
+      Object.entries(mapa).map(([id, qtd]) =>
+        supabase.from('voos').update({ desembarcados: qtd, ...carimbo() }).eq('id', id)
+      )
+    );
+    const falha = res.find((r) => r.error);
+    if (falha) {
+      avisar(`Erro: ${falha.error.message}`, 'erro');
+      return false;
+    }
+    avisar('Desembarque guardado.');
+    await carregarTudo();
+    return true;
   };
 
-  const salvarUtilizador = async (loginTxt, senhaTxt, perfilTxt) => {
-    const login = loginTxt.toUpperCase();
-    const hash = await hashSenha(login, senhaTxt);
-    const { error } = await supabase.from('usuarios').insert([{ login, senha: hash, perfil: perfilTxt }]);
-    if (error) return avisar('Erro ao criar utilizador (login já existe?).', 'erro');
-    avisar('Utilizador criado com sucesso!');
-    carregarDados();
+  const adicionarAeronave = (modelo) => gravar(supabase.from('aeronaves').insert({ modelo }), 'Aeronave adicionada.');
+  const pedirRemoverAeronave = (a) =>
+    setConfirmacao({
+      titulo: 'Remover aeronave?',
+      texto: `Remover ${a.modelo} da lista? Os voos já registados com este modelo não são alterados.`,
+      botao: 'Sim, remover',
+      aoConfirmar: () => gravar(supabase.from('aeronaves').delete().eq('id', a.id), 'Aeronave removida.')
+    });
+
+  const trocarSenha = async (nova) => {
+    if (nova.length < 6) {
+      avisar('A senha deve ter no mínimo 6 caracteres.', 'erro');
+      return false;
+    }
+    const senha_hash = await hashSenha(usuario.nome, nova);
+    return gravar(supabase.from('usuarios').update({ senha_hash }).eq('id', usuario.id), 'Senha atualizada.');
+  };
+  const criarUsuario = async (nome, senha, perfil) => {
+    if (senha.length < 6) {
+      avisar('A senha deve ter no mínimo 6 caracteres.', 'erro');
+      return false;
+    }
+    const senha_hash = await hashSenha(nome, senha);
+    return gravar(
+      supabase.from('usuarios').insert({ nome: nome.trim().toUpperCase(), senha_hash, perfil }),
+      'Utilizador cadastrado.'
+    );
+  };
+  const pedirRemoverUsuario = (u) =>
+    setConfirmacao({
+      titulo: 'Remover utilizador?',
+      texto: `${u.nome} deixará de conseguir entrar no sistema.`,
+      botao: 'Sim, remover',
+      aoConfirmar: () => gravar(supabase.from('usuarios').delete().eq('id', u.id), 'Utilizador removido.')
+    });
+
+  const ir = (id) => {
+    if (id === 'adicionar') setVooEditando(null);
+    setAba(id);
+    if (window.innerWidth < 1024) setMenuAberto(false);
+  };
+  const editar = (v) => {
+    setVooEditando(v);
+    setAba('adicionar');
   };
 
-  const apagarUtilizador = async (id) => {
-    const { error } = await supabase.from('usuarios').delete().eq('id', id);
-    if (error) return avisar('Erro ao apagar utilizador.', 'erro');
-    avisar('Utilizador apagado com sucesso!');
-    carregarDados();
-  };
-
-  const salvarAeronave = async (modeloTxt) => {
-    const modelo = modeloTxt.toUpperCase();
-    const { error } = await supabase.from('aeronaves').insert([{ modelo }]);
-    if (error) return avisar('Erro ao adicionar aeronave (já existe?).', 'erro');
-    avisar('Aeronave adicionada com sucesso!');
-    carregarDados();
-  };
-
-  const apagarAeronave = async (id) => {
-    const { error } = await supabase.from('aeronaves').delete().eq('id', id);
-    if (error) return avisar('Erro ao apagar aeronave.', 'erro');
-    avisar('Aeronave apagada com sucesso!');
-    carregarDados();
-  };
-
-  if (!configurado) return <TelaConfig />;
+  /* ---------- renderização ---------- */
+  if (!supabaseConfigurado) return <TelaConfig />;
   if (!usuario) return <TelaLogin onEntrar={entrar} online={online} />;
 
-  const menus = [
-    { id: 'dashboard', rotulo: 'Dashboard', icone: BarChart3 },
-    { id: 'painel', rotulo: 'Painel de voos
+  const abaAtual = MENU.find((m) => m.id === aba && (!m.admin || ehAdmin)) ? aba : 'dashboard';
+
+  return (
+    <div id="app-shell" className="flex h-screen flex-col bg-[#050a16] font-sans text-slate-200">
+      <style>{`
+        .print-only{display:none}
+        @media print{
+          @page{margin:12mm}
+          #root{display:none!important}
+          body{background:#fff!important}
+          .print-only{display:block!important;color:#000}
+          .print-only *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        }
+      `}</style>
+
+      {/* CABEÇALHO */}
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-[#0a1120] px-4 py-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setMenuAberto((m) => !m)}
+            className="rounded-xl border border-slate-700 p-2 text-slate-200 hover:bg-slate-800"
+            aria-label="Menu"
+          >
+            <Menu size={18} />
+          </button>
+          <div className="rounded-xl bg-sky-600 p-2 text-white shadow-lg shadow-sky-600/30">
+            <Plane size={20} />
+          </div>
+          <div>
+            <h1 className="text-base font-extrabold uppercase leading-tight tracking-wide text-white">
+              FlightOps <span className="text-sky-400">BSB</span>
+            </h1>
+            <p className="hidden text-[10px] uppercase text-slate-400 sm:block">Posto CAN BR — Base Aérea de Brasília (SBBR)</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase sm:flex ${
+              online ? 'border-emerald-900 bg-emerald-950/40 text-emerald-400' : 'border-amber-800 bg-amber-950/40 text-amber-400'
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'animate-pulse bg-amber-400'}`} />
+            {online ? 'Posto CAN BR operacional' : 'Sem ligação — a tentar…'}
+          </span>
+          <button
+            onClick={sair}
+            className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-sky-300 hover:bg-slate-800"
+            title="Sair"
+          >
+            {usuario.nome} ({usuario.perfil === 'admin' ? 'Admin' : 'Operador'}) <LogOut size={14} className="text-rose-400" />
+          </button>
+        </div>
+      </header>
+
+      <div className="relative flex min-h-0 flex-1">
+        {menuAberto && <div className="absolute inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setMenuAberto(false)} />}
+
+        {/* MENU LATERAL */}
+        {menuAberto && (
+          <aside className="absolute left-0 top-0 z-30 flex h-full w-60 shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0a1120] p-3 lg:static">
+            <nav className="space-y-1">
+              {MENU.filter((m) => !m.admin || ehAdmin).map(({ id, rotulo, Icone }) => (
+                <button
+                  key={id}
+                  onClick={() => ir(id)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${
+                    abaAtual === id ? 'bg-sky-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icone size={16} />
+                  <span className="flex-1">{rotulo}</span>
+                  {id === 'lixeira' && lixeira.length > 0 && (
+                    <span className="rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white">{lixeira.length}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
+            <button
+              onClick={() => setMenuAberto(false)}
+              className="flex items-center justify-center gap-2 rounded-lg bg-slate-800/70 py-2.5 text-xs text-slate-300 hover:bg-slate-800"
+            >
+              <ChevronLeft size={14} /> Ocultar Menu
+            </button>
+          </aside>
+        )}
+
+        {/* CONTEÚDO */}
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">
+          {carregando ? (
+            <p className="py-20 text-center text-xs uppercase text-slate-500">A carregar dados…</p>
+          ) : (
+            <>
+              {abaAtual === 'dashboard' && <TelaDashboard voos={ativos} aeronaves={aeronaves} />}
+              {abaAtual === 'voos' && <TelaPainel voos={ativos} aeronaves={aeronaves} onEditar={editar} onApagar={pedirExclusao} />}
+              {abaAtual === 'adicionar' && (
+                <FormVoo
+                  key={vooEditando?.id || 'novo'}
+                  aeronaves={aeronaves}
+                  voo={vooEditando}
+                  onSalvar={salvarVoo}
+                  onCancelar={() => {
+                    setVooEditando(null);
+                    setAba('voos');
+                  }}
+                  avisar={avisar}
+                />
+              )}
+              {abaAtual === 'desembarque' && <TelaDesembarque voos={ativos} aeronaves={aeronaves} onSalvar={salvarDesembarque} avisar={avisar} />}
+              {abaAtual === 'aeronaves' && <TelaAeronaves aeronaves={aeronaves} onAdicionar={adicionarAeronave} onRemover={pedirRemoverAeronave} />}
+              {abaAtual === 'relatorio' && <TelaRelatorio voos={ativos} aeronaves={aeronaves} />}
+              {abaAtual === 'usuarios' && (
+                <TelaUsuarios usuario={usuario} usuarios={usuarios} onSenha={trocarSenha} onCriar={criarUsuario} onRemover={pedirRemoverUsuario} />
+              )}
+              {abaAtual === 'lixeira' && <TelaLixeira voos={lixeira} onRestaurar={restaurarVoo} onExcluirDef={pedirExclusaoDefinitiva} />}
+            </>
+          )}
+        </main>
+      </div>
+
+      <Modal
+        dados={confirmacao}
+        onCancelar={() => setConfirmacao(null)}
+        onConfirmar={async () => {
+          await confirmacao.aoConfirmar();
+          setConfirmacao(null);
+        }}
+      />
+
+      {aviso && (
+        <div
+          className={`fixed bottom-4 right-4 z-50 max-w-xs rounded-xl border px-4 py-3 text-xs font-bold shadow-xl ${
+            aviso.tipo === 'erro' ? 'border-rose-800 bg-rose-950 text-rose-200' : 'border-emerald-800 bg-emerald-950 text-emerald-200'
+          }`}
+        >
+          {aviso.texto}
+        </div>
+      )}
+    </div>
+  );
+}

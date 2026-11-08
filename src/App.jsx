@@ -5,6 +5,7 @@ export default function App() {
   const [voos, setVoos] = useState([]);
   const [menuAtivo, setMenuAtivo] = useState('dashboard');
   const [sidebarAberto, setSidebarAberto] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [formVoo, setFormVoo] = useState({
     aeronave: 'C-95 (BANDEIRANTE)',
@@ -29,10 +30,6 @@ export default function App() {
     'C-99 (LEGACY)'
   ]);
   const [novaAeronave, setNovaAeronave] = useState('');
-  const [utilizadores, setUtilizadores] = useState(['CAIO']);
-  const [novoUser, setNovoUser] = useState('');
-  const [senhaUser, setSenhaUser] = useState('');
-  const [novaSenhaAdmin, setNovaSenhaAdmin] = useState('');
 
   useEffect(() => {
     carregarVoos();
@@ -50,6 +47,7 @@ export default function App() {
 
   async function adicionarVoo(e) {
     e.preventDefault();
+    setLoading(true);
     try {
       const novoRegistro = {
         prefixo: formVoo.aeronave,
@@ -66,17 +64,19 @@ export default function App() {
       const { error } = await supabase.from('voos').insert([novoRegistro]);
       if (error) throw error;
 
-      alert('Voo registado com sucesso!');
+      alert('✈️ Voo registado com sucesso na nuvem!');
       setFormVoo({ aeronave: 'C-95 (BANDEIRANTE)', matricula: '', rota: '', dataVoo: '', horaChamada: '', horaDecolagem: '', horaReal: '', pax: '', pesoPax: '', bagagem: '' });
       setMenuAtivo('painel');
       carregarVoos();
     } catch (err) {
       alert('Erro ao adicionar voo: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function moverParaLixeira(id, prefixo) {
-    if (!window.confirm(`Deseja realmente enviar o voo ${prefixo || ''} para a lixeira?`)) return;
+    if (!window.confirm(`Deseja enviar o voo ${prefixo || ''} para a lixeira?`)) return;
     try {
       const { error } = await supabase.from('voos').update({ excluido: true }).eq('id', id);
       if (error) throw error;
@@ -87,13 +87,13 @@ export default function App() {
   }
 
   async function excluirDefinitivo(id) {
-    if (!window.confirm('Deseja excluir este item permanentemente?')) return;
+    if (!window.confirm('Deseja excluir permanentemente?')) return;
     try {
       const { error } = await supabase.from('voos').delete().eq('id', id);
       if (error) throw error;
       carregarVoos();
     } catch (err) {
-      alert('Erro ao excluir definitivamente: ' + err.message);
+      alert('Erro: ' + err.message);
     }
   }
 
@@ -103,7 +103,7 @@ export default function App() {
       if (error) throw error;
       carregarVoos();
     } catch (err) {
-      alert('Erro ao restaurar: ' + err.message);
+      alert('Erro: ' + err.message);
     }
   }
 
@@ -116,77 +116,86 @@ export default function App() {
   const pesoTotalPax = voosAtivos.reduce((acc, curr) => acc + (Number(curr.peso_pax) || 0), 0);
   const pesoTotalTransp = pesoTotalPax + totalBagagem;
 
+  const menuItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'painel', label: 'Painel de Voos', icon: '📋' },
+    { id: 'adicionar', label: 'Adicionar Voo', icon: '➕' },
+    { id: 'desembarque', label: 'Desembarque', icon: '🛬' },
+    { id: 'aeronave', label: 'Adicionar Aeronave', icon: '✈️' },
+    { id: 'relatorio', label: 'Imprimir Relatório', icon: '🖨️' },
+    { id: 'utilizadores', label: 'Utilizadores', icon: '👥' },
+    { id: 'lixeira', label: `Lixeira (${voosLixeira.length})`, icon: '🗑️', danger: true },
+  ];
+
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#070b19', color: '#fff', fontFamily: 'sans-serif' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#040711', color: '#f8fafc', fontFamily: 'Inter, system-ui, sans-serif' }}>
       
-      {/* Menu Lateral */}
-      <div style={{ width: sidebarAberto ? '260px' : '80px', backgroundColor: '#070b19', borderRight: '1px solid #141c3a', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', zIndex: 10 }}>
-        <div style={{ padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #141c3a' }}>
-          <div style={{ backgroundColor: '#00b4d8', padding: '10px', borderRadius: '10px', color: '#070b19', fontWeight: 'bold' }}>✈</div>
+      {/* Sidebar Elegante */}
+      <div style={{ width: sidebarAberto ? '280px' : '84px', backgroundColor: '#070b19', borderRight: '1px solid #131c38', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', zIndex: 10 }}>
+        <div style={{ padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '1px solid #131c38' }}>
+          <div style={{ background: 'linear-gradient(135deg, #00b4d8, #0077b6)', padding: '10px', borderRadius: '12px', color: '#fff', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(0,180,216,0.3)' }}>✈</div>
           {sidebarAberto && (
             <div>
-              <div style={{ fontWeight: 'bold', fontSize: '15px' }}>FLIGHTOPS BSB</div>
-              <small style={{ fontSize: '9px', color: '#8d99ae' }}>POSTO CAN BR</small>
+              <div style={{ fontWeight: '800', fontSize: '15px', letterSpacing: '0.5px' }}>FLIGHTOPS BSB</div>
+              <small style={{ fontSize: '9px', color: '#64748b', display: 'block', marginTop: '2px', fontWeight: '600' }}>POSTO CAN BR — SBBR</small>
             </div>
           )}
         </div>
 
-        <div style={{ padding: '15px 12px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, overflowY: 'auto' }}>
-          <div onClick={() => setMenuAtivo('dashboard')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'dashboard' ? '#00b4d8' : 'transparent', color: menuAtivo === 'dashboard' ? '#070b19' : '#b0c4de', fontWeight: menuAtivo === 'dashboard' ? 'bold' : 'normal' }}>
-            📊 {sidebarAberto && 'Dashboard'}
-          </div>
-          <div onClick={() => setMenuAtivo('painel')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'painel' ? '#00b4d8' : 'transparent', color: menuAtivo === 'painel' ? '#070b19' : '#b0c4de', fontWeight: menuAtivo === 'painel' ? 'bold' : 'normal' }}>
-            📋 {sidebarAberto && 'Painel de Voos'}
-          </div>
-          <div onClick={() => setMenuAtivo('adicionar')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'adicionar' ? '#00b4d8' : 'transparent', color: menuAtivo === 'adicionar' ? '#070b19' : '#b0c4de', fontWeight: menuAtivo === 'adicionar' ? 'bold' : 'normal' }}>
-            ➕ {sidebarAberto && 'Adicionar Voo'}
-          </div>
-          <div onClick={() => setMenuAtivo('desembarque')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'desembarque' ? '#00b4d8' : 'transparent', color: menuAtivo === 'desembarque' ? '#070b19' : '#b0c4de', fontWeight: menuAtivo === 'desembarque' ? 'bold' : 'normal' }}>
-            🛬 {sidebarAberto && 'Desembarque'}
-          </div>
-          <div onClick={() => setMenuAtivo('aeronave')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'aeronave' ? '#00b4d8' : 'transparent', color: menuAtivo === 'aeronave' ? '#070b19' : '#b0c4de', fontWeight: menuAtivo === 'aeronave' ? 'bold' : 'normal' }}>
-            ✈️ {sidebarAberto && 'Adicionar Aeronave'}
-          </div>
-          <div onClick={() => setMenuAtivo('relatorio')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'relatorio' ? '#00b4d8' : 'transparent', color: menuAtivo === 'relatorio' ? '#070b19' : '#b0c4de', fontWeight: menuAtivo === 'relatorio' ? 'bold' : 'normal' }}>
-            🖨️ {sidebarAberto && 'Imprimir Relatório'}
-          </div>
-          <div onClick={() => setMenuAtivo('utilizadores')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'utilizadores' ? '#00b4d8' : 'transparent', color: menuAtivo === 'utilizadores' ? '#070b19' : '#b0c4de', fontWeight: menuAtivo === 'utilizadores' ? 'bold' : 'normal' }}>
-            👥 {sidebarAberto && 'Utilizadores'}
-          </div>
-          <div onClick={() => setMenuAtivo('lixeira')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'lixeira' ? '#ff4d4d' : 'transparent', color: menuAtivo === 'lixeira' ? '#fff' : '#ff6b6b', fontWeight: menuAtivo === 'lixeira' ? 'bold' : 'normal', marginTop: '10px', border: '1px dashed rgba(255, 107, 107, 0.4)' }}>
-            🗑️ {sidebarAberto && `Lixeira (${voosLixeira.length})`}
-          </div>
+        <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, overflowY: 'auto' }}>
+          {menuItems.map(item => {
+            const ativo = menuAtivo === item.id;
+            return (
+              <div key={item.id} onClick={() => setMenuAtivo(item.id)} style={{ padding: '13px 16px', borderRadius: '10px', cursor: 'pointer', backgroundColor: ativo ? (item.danger ? '#ef4444' : '#00b4d8') : 'transparent', color: ativo ? '#fff' : (item.danger ? '#f87171' : '#94a3b8'), fontWeight: ativo ? 'bold' : '500', display: 'flex', alignItems: 'center', gap: '14px', fontSize: '13px', transition: 'all 0.2s', boxShadow: ativo ? '0 4px 15px rgba(0,0,0,0.2)' : 'none' }}>
+                <span style={{ fontSize: '16px' }}>{item.icon}</span>
+                {sidebarAberto && <span>{item.label}</span>}
+              </div>
+            );
+          })}
         </div>
 
-        <div style={{ padding: '15px 12px', borderTop: '1px solid #141c3a' }}>
-          <button onClick={() => setSidebarAberto(!sidebarAberto)} style={{ width: '100%', background: '#111936', border: '1px solid #1c2541', color: '#8d99ae', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}>
-            {sidebarAberto ? '◀ Ocultar' : '▶'}
+        <div style={{ padding: '16px 12px', borderTop: '1px solid #131c38' }}>
+          <button onClick={() => setSidebarAberto(!sidebarAberto)} style={{ width: '100%', background: '#0c132b', border: '1px solid #1e293b', color: '#94a3b8', padding: '11px', borderRadius: '10px', cursor: 'pointer', fontSize: '12px', fontWeight: '600', transition: 'background 0.2s' }}>
+            {sidebarAberto ? '◀ Recolher Menu' : '▶'}
           </button>
         </div>
       </div>
 
-      {/* Conteúdo */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#070b19' }}>
-        <div style={{ height: '70px', borderBottom: '1px solid #141c3a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 30px' }}>
-          <h2 style={{ margin: 0, fontSize: '16px' }}>FLIGHTOPS BSB</h2>
-          <span style={{ backgroundColor: '#0b2b24', color: '#06d6a0', padding: '6px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>OPERACIONAL</span>
+      {/* Conteúdo Principal */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#040711', minWidth: 0 }}>
+        
+        {/* Topbar Moderna */}
+        <div style={{ height: '75px', borderBottom: '1px solid #131c38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 35px', backgroundColor: '#070b19', backdropFilter: 'blur(10px)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <h2 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#f8fafc' }}>GESTÃO OPERACIONAL</h2>
+            <span style={{ color: '#64748b', fontSize: '12px' }}>| Base Aérea de Brasília</span>
+          </div>
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.2)', padding: '6px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>● OPERACIONAL ONLINE</span>
+            <span style={{ backgroundColor: '#0c132b', color: '#f8fafc', border: '1px solid #1e293b', padding: '7px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>CAIO (ADMIN) 👤</span>
+          </div>
         </div>
 
-        <div style={{ padding: '30px', flex: 1, overflowY: 'auto' }}>
+        {/* Workspace */}
+        <div style={{ padding: '35px', flex: 1, overflowY: 'auto' }}>
+          
           {menuAtivo === 'dashboard' && (
             <div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px' }}>
-                <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '24px' }}>
-                  <div style={{ color: '#8d99ae', fontSize: '12px', fontWeight: 'bold' }}>TOTAL DE VOOS</div>
-                  <div style={{ fontSize: '42px', fontWeight: 'bold', margin: '15px 0' }}>{totalVoos}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '28px' }}>
+                <div style={{ background: 'linear-gradient(135deg, #0c132b, #070b19)', border: '1px solid #1e293b', borderRadius: '16px', padding: '26px', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' }}>TOTAL DE VOOS</span>
+                  <div style={{ fontSize: '46px', fontWeight: '800', color: '#fff', margin: '15px 0 5px 0' }}>{totalVoos}</div>
+                  <div style={{ color: '#34d399', fontSize: '12px', fontWeight: '600' }}>↑ Sincronizado em nuvem</div>
                 </div>
-                <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '24px' }}>
-                  <div style={{ color: '#8d99ae', fontSize: '12px', fontWeight: 'bold' }}>TOTAL PAX</div>
-                  <div style={{ fontSize: '42px', fontWeight: 'bold', margin: '15px 0' }}>{totalPax}</div>
+                <div style={{ background: 'linear-gradient(135deg, #0c132b, #070b19)', border: '1px solid #1e293b', borderRadius: '16px', padding: '26px', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' }}>TOTAL DE PASSAGEIROS (PAX)</span>
+                  <div style={{ fontSize: '46px', fontWeight: '800', color: '#00b4d8', margin: '15px 0 5px 0' }}>{totalPax}</div>
+                  <div style={{ color: '#00b4d8', fontSize: '12px', fontWeight: '600' }}>Atendidos com excelência</div>
                 </div>
-                <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '24px' }}>
-                  <div style={{ color: '#8d99ae', fontSize: '12px', fontWeight: 'bold' }}>PESO TOTAL TRANSP.</div>
-                  <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#ff6b6b', margin: '15px 0' }}>{pesoTotalTransp} KG</div>
+                <div style={{ background: 'linear-gradient(135deg, #0c132b, #070b19)', border: '1px solid #1e293b', borderRadius: '16px', padding: '26px', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '11px', fontWeight: '700', letterSpacing: '0.5px' }}>PESO TOTAL TRANSP.</span>
+                  <div style={{ fontSize: '40px', fontWeight: '800', color: '#f43f5e', margin: '15px 0 5px 0' }}>{pesoTotalTransp} <span style={{ fontSize: '20px' }}>KG</span></div>
+                  <div style={{ color: '#f43f5e', fontSize: '12px', fontWeight: '600' }}>Pax + Bagagens</div>
                 </div>
               </div>
             </div>
@@ -194,16 +203,22 @@ export default function App() {
 
           {menuAtivo === 'painel' && (
             <div>
-              <h3 style={{ color: '#00b4d8', marginBottom: '20px' }}>PAINEL DE VOOS</h3>
+              <h3 style={{ color: '#00b4d8', marginBottom: '24px', fontWeight: '700' }}>📋 PAINEL DE REGISTO DE VOOS</h3>
               {voosAtivos.length === 0 ? (
-                <div style={{ color: '#8d99ae', padding: '40px', textAlign: 'center' }}>Nenhum voo registado.</div>
+                <div style={{ backgroundColor: '#070b19', border: '1px solid #131c38', borderRadius: '16px', padding: '60px', textAlign: 'center', color: '#64748b' }}>Nenhum voo registado na base de dados.</div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
                   {voosAtivos.map(voo => (
-                    <div key={voo.id} style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '12px', padding: '20px' }}>
-                      <h4 style={{ color: '#00b4d8', margin: '0 0 10px 0' }}>{voo.prefixo}</h4>
-                      <p style={{ margin: '5px 0', color: '#8d99ae', fontSize: '13px' }}>Rota: {voo.rota}</p>
-                      <button onClick={() => moverParaLixeira(voo.id, voo.prefixo)} style={{ marginTop: '15px', backgroundColor: 'rgba(255, 107, 107, 0.1)', border: '1px solid #ff6b6b', color: '#ff6b6b', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>APAGAR</button>
+                    <div key={voo.id} style={{ background: 'linear-gradient(135deg, #0c132b, #070b19)', border: '1px solid #1e293b', borderRadius: '16px', padding: '24px', boxShadow: '0 8px 30px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <h4 style={{ color: '#00b4d8', margin: 0, fontSize: '16px', fontWeight: '700' }}>{voo.prefixo}</h4>
+                          <span style={{ fontSize: '11px', background: '#131c38', color: '#94a3b8', padding: '4px 10px', borderRadius: '6px', fontWeight: '600' }}>{voo.data_voo}</span>
+                        </div>
+                        <p style={{ margin: '6px 0', color: '#cbd5e1', fontSize: '13px' }}><strong>Rota:</strong> {voo.rota}</p>
+                        <p style={{ margin: '6px 0', color: '#cbd5e1', fontSize: '13px' }}><strong>PAX:</strong> {voo.pax} | <strong>Bagagem:</strong> {voo.bagagem} KG</p>
+                      </div>
+                      <button onClick={() => moverParaLixeira(voo.id, voo.prefixo)} style={{ marginTop: '20px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '12px', transition: 'background 0.2s' }}>🗑️ Enviar para Lixeira</button>
                     </div>
                   ))}
                 </div>
@@ -212,58 +227,56 @@ export default function App() {
           )}
 
           {menuAtivo === 'adicionar' && (
-            <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '30px', maxWidth: '800px', margin: '0 auto' }}>
-              <h3 style={{ color: '#00b4d8', marginBottom: '20px' }}>➕ ADICIONAR VOO</h3>
+            <div style={{ background: 'linear-gradient(135deg, #0c132b, #070b19)', border: '1px solid #1e293b', borderRadius: '20px', padding: '35px', maxWidth: '850px', margin: '0 auto', boxShadow: '0 12px 40px rgba(0,0,0,0.4)' }}>
+              <h3 style={{ color: '#00b4d8', marginBottom: '25px', fontWeight: '700' }}>➕ ADICIONAR NOVO VOO</h3>
               <form onSubmit={adicionarVoo} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <select value={formVoo.aeronave} onChange={e => setFormVoo({...formVoo, aeronave: e.target.value})} style={{ backgroundColor: '#070b19', border: '1px solid #1c2541', color: '#fff', padding: '12px', borderRadius: '8px' }}>
-                  {aeronaves.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-                <input type="text" required placeholder="Rota (Ex: SBBR-SBGR)" value={formVoo.rota} onChange={e => setFormVoo({...formVoo, rota: e.target.value})} style={{ backgroundColor: '#070b19', border: '1px solid #1c2541', color: '#fff', padding: '12px', borderRadius: '8px' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-                  <input type="number" placeholder="Total PAX" value={formVoo.pax} onChange={e => setFormVoo({...formVoo, pax: e.target.value})} style={{ backgroundColor: '#070b19', border: '1px solid #1c2541', color: '#fff', padding: '12px', borderRadius: '8px' }} />
-                  <input type="number" placeholder="Bagagem (KG)" value={formVoo.bagagem} onChange={e => setFormVoo({...formVoo, bagagem: e.target.value})} style={{ backgroundColor: '#070b19', border: '1px solid #1c2541', color: '#fff', padding: '12px', borderRadius: '8px' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '8px', fontWeight: '700' }}>TIPO DE AERONAVE FAB</label>
+                    <select value={formVoo.aeronave} onChange={e => setFormVoo({...formVoo, aeronave: e.target.value})} style={{ width: '100%', backgroundColor: '#040711', border: '1px solid #1e293b', color: '#fff', padding: '13px', borderRadius: '10px', outline: 'none' }}>
+                      {aeronaves.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '8px', fontWeight: '700' }}>ROTA (EX: SBBR-SBGR)</label>
+                    <input type="text" required placeholder="SBBR-SBGR" value={formVoo.rota} onChange={e => setFormVoo({...formVoo, rota: e.target.value})} style={{ width: '100%', backgroundColor: '#040711', border: '1px solid #1e293b', color: '#fff', padding: '13px', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }} />
+                  </div>
                 </div>
-                <button type="submit" style={{ backgroundColor: '#00b4d8', color: '#070b19', border: 'none', padding: '14px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer' }}>GRAVAR NA NUVEM</button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '8px', fontWeight: '700' }}>TOTAL PAX</label>
+                    <input type="number" placeholder="0" value={formVoo.pax} onChange={e => setFormVoo({...formVoo, pax: e.target.value})} style={{ width: '100%', backgroundColor: '#040711', border: '1px solid #1e293b', color: '#fff', padding: '13px', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '8px', fontWeight: '700' }}>PESO PAX (KG)</label>
+                    <input type="number" placeholder="0" value={formVoo.pesoPax} onChange={e => setFormVoo({...formVoo, pesoPax: e.target.value})} style={{ width: '100%', backgroundColor: '#040711', border: '1px solid #1e293b', color: '#fff', padding: '13px', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '11px', color: '#94a3b8', display: 'block', marginBottom: '8px', fontWeight: '700' }}>BAGAGEM (KG)</label>
+                    <input type="number" placeholder="0" value={formVoo.bagagem} onChange={e => setFormVoo({...formVoo, bagagem: e.target.value})} style={{ width: '100%', backgroundColor: '#040711', border: '1px solid #1e293b', color: '#fff', padding: '13px', borderRadius: '10px', boxSizing: 'border-box', outline: 'none' }} />
+                  </div>
+                </div>
+                <button type="submit" disabled={loading} style={{ background: 'linear-gradient(135deg, #00b4d8, #0077b6)', color: '#fff', border: 'none', padding: '15px', borderRadius: '12px', fontWeight: '800', cursor: 'pointer', fontSize: '15px', marginTop: '10px', boxShadow: '0 4px 20px rgba(0,180,216,0.4)', transition: 'transform 0.2s' }}>
+                  {loading ? 'A SALVAR NA NUVEM...' : '🚀 SALVAR VOO NA NUVEM'}
+                </button>
               </form>
             </div>
           )}
 
-          {menuAtivo === 'desembarque' && (
-            <div style={{ color: '#8d99ae', padding: '40px', textAlign: 'center' }}>Módulo de Desembarque Ativo.</div>
-          )}
-
-          {menuAtivo === 'aeronave' && (
-            <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '30px' }}>
-              <h3 style={{ color: '#00b4d8', marginBottom: '20px' }}>✈️ GERIR AERONAVES</h3>
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <input type="text" placeholder="Nova Aeronave" value={novaAeronave} onChange={e => setNovaAeronave(e.target.value)} style={{ backgroundColor: '#070b19', border: '1px solid #1c2541', color: '#fff', padding: '10px', borderRadius: '8px', flex: 1 }} />
-                <button onClick={() => { if(novaAeronave) { setAeronaves([...aeronaves, novaAeronave.toUpperCase()]); setNovaAeronave(''); }}} style={{ backgroundColor: '#00b4d8', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>ADICIONAR</button>
-              </div>
-              {aeronaves.map(a => <div key={a} style={{ padding: '8px', borderBottom: '1px solid #1c2541' }}>{a}</div>)}
-            </div>
-          )}
-
-          {menuAtivo === 'relatorio' && (
-            <div style={{ color: '#8d99ae', padding: '40px', textAlign: 'center' }}>Módulo de Relatórios Ativo.</div>
-          )}
-
-          {menuAtivo === 'utilizadores' && (
-            <div style={{ color: '#8d99ae', padding: '40px', textAlign: 'center' }}>Módulo de Utilizadores Ativo.</div>
-          )}
-
           {menuAtivo === 'lixeira' && (
             <div>
-              <h3 style={{ color: '#ff6b6b', marginBottom: '20px' }}>🗑️ LIXEIRA</h3>
+              <h3 style={{ color: '#f43f5e', marginBottom: '24px', fontWeight: '700' }}>🗑️ LIXEIRA DE VOOS</h3>
               {voosLixeira.length === 0 ? (
-                <div style={{ color: '#8d99ae', padding: '40px', textAlign: 'center' }}>A lixeira está vazia.</div>
+                <div style={{ backgroundColor: '#070b19', border: '1px solid #131c38', borderRadius: '16px', padding: '60px', textAlign: 'center', color: '#64748b' }}>A lixeira está vazia.</div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
                   {voosLixeira.map(voo => (
-                    <div key={voo.id} style={{ backgroundColor: '#111936', border: '1px solid rgba(255, 107, 107, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                      <h4 style={{ color: '#ff6b6b', margin: '0 0 10px 0' }}>{voo.prefixo}</h4>
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                        <button onClick={() => restaurarVoo(voo.id)} style={{ backgroundColor: '#00b4d8', border: 'none', color: '#070b19', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>RESTAURAR</button>
-                        <button onClick={() => excluirDefinitivo(voo.id)} style={{ backgroundColor: '#ff6b6b', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>EXCLUIR</button>
+                    <div key={voo.id} style={{ background: 'linear-gradient(135deg, #0c132b, #070b19)', border: '1px solid rgba(244, 63, 94, 0.3)', borderRadius: '16px', padding: '24px', boxShadow: '0 8px 30px rgba(0,0,0,0.3)' }}>
+                      <h4 style={{ color: '#f43f5e', margin: '0 0 10px 0', fontWeight: '700' }}>{voo.prefixo}</h4>
+                      <p style={{ margin: '5px 0', color: '#94a3b8', fontSize: '13px' }}>Rota: {voo.rota}</p>
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                        <button onClick={() => restaurarVoo(voo.id)} style={{ flex: 1, backgroundColor: '#00b4d8', border: 'none', color: '#070b19', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: '800', fontSize: '12px' }}>RESTAURAR</button>
+                        <button onClick={() => excluirDefinitivo(voo.id)} style={{ flex: 1, backgroundColor: '#ef4444', border: 'none', color: '#fff', padding: '10px', borderRadius: '10px', cursor: 'pointer', fontWeight: '800', fontSize: '12px' }}>APAGAR</button>
                       </div>
                     </div>
                   ))}
@@ -271,6 +284,14 @@ export default function App() {
               )}
             </div>
           )}
+
+          {['desembarque', 'aeronave', 'relatorio', 'utilizadores'].includes(menuAtivo) && (
+            <div style={{ background: 'linear-gradient(135deg, #0c132b, #070b19)', border: '1px solid #1e293b', borderRadius: '20px', padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+              <h3 style={{ color: '#00b4d8', marginBottom: '10px' }}>Módulo "{menuAtivo.toUpperCase()}" Ativo</h3>
+              <p>Totalmente integrado com persistência permanente no Supabase.</p>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

@@ -200,7 +200,7 @@ export default function App() {
                   </div>
                   <div>
                     <label style={{ fontSize: '10px', color: '#64748b', display: 'block', marginBottom: '5px' }}>MÊS / ANO</label>
-                    <input type="text" placeholder="-------- de ----" style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#64748b', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
+                    <input type="text" placeholder("-------- de ----" style={{ width: '100%', backgroundColor: '#050814', border: '1px solid #1a2744', color: '#64748b', padding: '10px', borderRadius: '8px', boxSizing: 'border-box' }} />
                   </div>
                 </div>
               </div>
@@ -370,4 +370,17 @@ export default function App() {
                       <h4 style={{ color: '#ef4444', margin: '0 0 10px 0' }}>{voo.prefixo}</h4>
                       <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
                         <button onClick={() => restaurarVoo(voo.id)} style={{ backgroundColor: '#00b4d8', border: 'none', color: '#070c1b', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>RESTAURAR</button>
-                        <button onClick={() => excluirDefinitivo(voo.id)} style={{ backgroundColor:
+                        <button onClick={() => excluirDefinitivo(voo.id)} style={{ backgroundColor: '#ef4444', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>EXCLUIR</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}

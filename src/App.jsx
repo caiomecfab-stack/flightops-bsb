@@ -104,7 +104,7 @@ export default function App() {
   const pesoTotalTransp = pesoTotalPax + totalBagagem;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#070b19', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#070b19', color: '#fff', fontFamily: 'sans-serif' }}>
       
       {/* Menu Lateral Esquerdo */}
       <div style={{ width: sidebarAberto ? '260px' : '80px', backgroundColor: '#070b19', borderRight: '1px solid #141c3a', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', zIndex: 10 }}>
@@ -113,7 +113,7 @@ export default function App() {
           {sidebarAberto && (
             <div>
               <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#fff' }}>FLIGHTOPS BSB</div>
-              <small style={{ fontSize: '9px', color: '#8d99ae', display: 'block', marginTop: '2px' }}>POSTO CAN BR — BASE AÉREA</small>
+              <small style={{ fontSize: '9px', color: '#8d99ae', display: 'block', marginTop: '2px' }}>POSTO CAN BR</small>
             </div>
           )}
         </div>
@@ -167,12 +167,12 @@ export default function App() {
             <div style={{ backgroundColor: '#00b4d8', color: '#070b19', padding: '8px', borderRadius: '8px', fontWeight: 'bold' }}>✈</div>
             <div>
               <h2 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: 'bold' }}>FLIGHTOPS BSB</h2>
-              <small style={{ color: '#8d99ae', fontSize: '10px' }}>POSTO CAN BR — BASE AÉREA DE BRASÍLIA (SBBR)</small>
+              <small style={{ color: '#8d99ae', fontSize: '10px' }}>POSTO CAN BR</small>
             </div>
           </div>
           <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-            <span style={{ backgroundColor: '#0b2b24', color: '#06d6a0', border: '1px solid rgba(6, 214, 160, 0.2)', padding: '6px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>POSTO CAN BR OPERACIONAL</span>
-            <span style={{ backgroundColor: '#111936', color: '#fff', border: '1px solid #1c2541', padding: '6px 16px', borderRadius: '20px', fontSize: '11px' }}>CAIO (ADMIN) 👤</span>
+            <span style={{ backgroundColor: '#0b2b24', color: '#06d6a0', border: '1px solid rgba(6, 214, 160, 0.2)', padding: '6px 16px', borderRadius: '20px', fontSize: '11px', fontWeight: 'bold' }}>OPERACIONAL</span>
+            <span style={{ backgroundColor: '#111936', color: '#fff', border: '1px solid #1c2541', padding: '6px 16px', borderRadius: '20px', fontSize: '11px' }}>CAIO (ADMIN)</span>
           </div>
         </div>
 
@@ -181,7 +181,7 @@ export default function App() {
           {menuAtivo === 'dashboard' && (
             <div>
               <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '24px', marginBottom: '25px' }}>
-                <div style={{ color: '#00b4d8', fontSize: '12px', fontWeight: 'bold', marginBottom: '18px' }}>🔍 FILTROS OPERACIONAIS — POSTO CAN BR</div>
+                <div style={{ color: '#00b4d8', fontSize: '12px', fontWeight: 'bold', marginBottom: '18px' }}>🔍 FILTROS OPERACIONAIS</div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px', marginBottom: '20px' }}>
                   <div>
@@ -210,7 +210,7 @@ export default function App() {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', borderTop: '1px solid #1c2541', paddingTop: '20px' }}>
                   <div>
-                    <label style={{ fontSize: '11px', color: '#00b4d8', display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>📍 FILTRAR PAX POR LOCALIDADE / DESTINO:</label>
+                    <label style={{ fontSize: '11px', color: '#00b4d8', display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>📍 FILTRAR PAX POR LOCALIDADE:</label>
                     <select style={{ width: '100%', backgroundColor: '#070b19', border: '1px solid #1c2541', color: '#fff', padding: '11px', borderRadius: '8px', fontSize: '13px' }}>
                       <option>TODAS AS LOCALIDADES (GERAL)</option>
                     </select>
@@ -227,7 +227,7 @@ export default function App() {
               <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '22px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
                 <div>
                   <div style={{ color: '#00b4d8', fontSize: '15px', fontWeight: 'bold' }}>📊 PERFIL ESTATÍSTICO OPERACIONAL</div>
-                  <small style={{ color: '#8d99ae', fontSize: '12px' }}>Gere a visão consolidada por tipo de aeronave aplicando os filtros</small>
+                  <small style={{ color: '#8d99ae', fontSize: '12px' }}>Gere a visão consolidada</small>
                 </div>
                 <button onClick={() => alert('Estatísticas geradas!')} style={{ backgroundColor: '#00b4d8', color: '#070b19', border: 'none', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
                   ⏱️ GERAR ESTATÍSTICA
@@ -273,7 +273,7 @@ export default function App() {
             <div>
               <h3 style={{ color: '#00b4d8', marginBottom: '20px' }}>PAINEL DE REGISTO DE VOOS</h3>
               {voosAtivos.length === 0 ? (
-                <div style={{ color: '#8d99ae', padding: '40px', textAlign: 'center' }}>Nenhum voo registado na base de dados.</div>
+                <div style={{ color: '#8d99ae', padding: '40px', textAlign: 'center' }}>Nenhum voo registado.</div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
                   {voosAtivos.map(voo => (
@@ -337,7 +337,7 @@ export default function App() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
                   {voosLixeira.map(voo => (
                     <div key={voo.id} style={{ backgroundColor: '#111936', border: '1px solid rgba(255, 107, 107, 0.3)', borderRadius: '12px', padding: '20px' }}>
-                      <h4 style={{ color: '#ff6b6b', margin: '0 0 10px 0' }}>{voo.prefixo}</h4>
+                      <h4 style={{ color: '#ff6b6b', margin: '0 0 10px 0'}>{voo.prefixo}</h4>
                       <p style={{ margin: '5px 0', color: '#8d99ae', fontSize: '13px' }}>Rota: {voo.rota}</p>
                       <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
                         <button onClick={() => restaurarVoo(voo.id)} style={{ backgroundColor: '#00b4d8', border: 'none', color: '#070b19', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>RESTAURAR</button>

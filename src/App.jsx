@@ -75,7 +75,7 @@ export default function App() {
           {sidebarAberto && (
             <div>
               <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#fff' }}>FLIGHTOPS BSB</div>
-              <small style={{ fontSize: '9px', color: '#8d99ae', display: 'block', marginTop: '2px' }}>POSTO CAN BR — BASE AÉREA DE BRASÍLIA (SBBR)</small>
+              <small style={{ fontSize: '9px', color: '#8d99ae', display: 'block', marginTop: '2px' }}>POSTO CAN BR — BASE AÉREA DE BRASÍLIA</small>
             </div>
           )}
         </div>

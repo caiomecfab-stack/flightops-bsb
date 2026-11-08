@@ -6,7 +6,6 @@ export default function App() {
   const [menuAtivo, setMenuAtivo] = useState('dashboard');
   const [sidebarAberto, setSidebarAberto] = useState(true);
 
-  // Estados do formulário de Adicionar Voo
   const [formVoo, setFormVoo] = useState({
     aeronave: '',
     matricula: '',
@@ -151,11 +150,9 @@ export default function App() {
             👥 {sidebarAberto && <span>Utilizadores</span>}
           </div>
 
-          {/* Opção Lixeira dedicada no menu esquerdo */}
           <div onClick={() => setMenuAtivo('lixeira')} style={{ padding: '12px 14px', borderRadius: '8px', cursor: 'pointer', backgroundColor: menuAtivo === 'lixeira' ? '#ff4d4d' : 'transparent', color: menuAtivo === 'lixeira' ? '#fff' : '#ff6b6b', fontWeight: menuAtivo === 'lixeira' ? 'bold' : 'normal', display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', marginTop: '10px', border: '1px dashed rgba(255, 107, 107, 0.4)' }}>
             🗑️ {sidebarAberto && <span>Lixeira ({voosLixeira.length})</span>}
           </div>
-
         </div>
 
         <div style={{ padding: '15px 12px', borderTop: '1px solid #141c3a' }}>
@@ -188,7 +185,7 @@ export default function App() {
           
           {menuAtivo === 'dashboard' && (
             <>
-              {/* Filtros Operacionais Completos */}
+              {/* Filtros Operacionais */}
               <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '24px', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
                 <div style={{ color: '#00b4d8', fontSize: '12px', fontWeight: 'bold', marginBottom: '18px' }}>
                   🔍 FILTROS OPERACIONAIS — POSTO CAN BR
@@ -235,13 +232,13 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Perfil Estatístico com Botão Gerar Estatística */}
+              {/* Perfil Estatístico */}
               <div style={{ backgroundColor: '#111936', border: '1px solid #1c2541', borderRadius: '14px', padding: '22px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
                 <div>
                   <div style={{ color: '#00b4d8', fontSize: '15px', fontWeight: 'bold' }}>📊 PERFIL ESTATÍSTICO OPERACIONAL</div>
                   <small style={{ color: '#8d99ae', fontSize: '12px' }}>Gere a visão consolidada por tipo de aeronave aplicando os filtros de data acima</small>
                 </div>
-                <button onClick={() => alert('Estatísticas geradas com sucesso com base nos filtros operacionais!')} style={{ backgroundColor: '#00b4d8', color: '#070b19', border: 'none', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                <button onClick={() => alert('Estatísticas geradas com sucesso!')} style={{ backgroundColor: '#00b4d8', color: '#070b19', border: 'none', padding: '12px 24px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                   ⏱️ GERAR ESTATÍSTICA
                 </button>
               </div>

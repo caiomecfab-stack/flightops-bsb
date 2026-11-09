@@ -331,6 +331,50 @@ function FundoAeronaves() {
 /* ================================================================
    COMPONENTES PEQUENOS
    ================================================================ */
+const PERFIS = { admin: 'Admin', operador: 'Operador', observador: 'Observador' };
+
+const HELICOPTERO = (
+  <g {...traco}>
+    <rect x="28" y="8" width="132" height="4" rx="2" />
+    <rect x="91" y="12" width="6" height="10" />
+    <path d="M58 36 Q58 22 92 22 L128 22 Q150 24 152 38 L150 48 Q140 54 100 54 L70 54 Q56 50 58 36 Z" />
+    <path d="M148 30 L204 26 L206 34 L150 42 Z" />
+    <path d="M196 14 L210 14 L210 40 L204 40 Z" />
+    <path d="M68 61 L148 61" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    <path d="M86 54 L84 61 M126 54 L128 61" stroke="currentColor" strokeWidth="2" />
+  </g>
+);
+
+// Escolhe o desenho conforme o tipo de aeronave escrito
+const desenhoDoModelo = (modelo) => {
+  const m = (modelo || '').toUpperCase();
+  if (/H-\d|HAWK|CARACAL|HELI/.test(m)) return HELICOPTERO;
+  const id = m.includes('KC-390')
+    ? 'kc390'
+    : m.includes('KC-30')
+    ? 'kc30'
+    : m.includes('C-105')
+    ? 'c105'
+    : m.includes('C-99')
+    ? 'c99'
+    : m.includes('C-98')
+    ? 'c98'
+    : m.includes('C-97')
+    ? 'c97'
+    : m.includes('C-95')
+    ? 'c98'
+    : null;
+  return (AVIOES.find((a) => a.id === id) || AVIOES[3]).desenho;
+};
+
+function IconeAeronave({ modelo, className = 'w-24' }) {
+  return (
+    <svg viewBox="0 0 220 70" className={`${className} shrink-0 text-sky-300`} fill="currentColor" role="img" aria-label={modelo}>
+      {desenhoDoModelo(modelo)}
+    </svg>
+  );
+}
+
 function Campo({ rotulo, children, className = '' }) {
   return (
     <div className={className}>
@@ -635,7 +679,7 @@ function Caixa({ rotulo, valor, destaque }) {
   );
 }
 
-function CartaoVoo({ v, onEditar, onApagar }) {
+function CartaoVoo({ v, onEditar, onApagar, podeEditar }) {
   const ef = calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real);
   const corEf =
     ef === null
@@ -646,11 +690,14 @@ function CartaoVoo({ v, onEditar, onApagar }) {
   return (
     <div className={`${C.painel} space-y-4 p-5`}>
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-bold uppercase text-sky-400">{v.aeronave}</h3>
-          <p className="mt-1 text-xs uppercase text-slate-300">
-            Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
-          </p>
+        <div className="flex items-center gap-3">
+          <IconeAeronave modelo={v.aeronave} className="w-20" />
+          <div>
+            <h3 className="text-base font-bold uppercase text-sky-400">{v.aeronave}</h3>
+            <p className="mt-1 text-xs uppercase text-slate-300">
+              Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
+            </p>
+          </div>
         </div>
         <div className="text-right">
           <span className="inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-xs font-bold text-sky-300">
@@ -698,14 +745,16 @@ function CartaoVoo({ v, onEditar, onApagar }) {
           Última alt. por: <b className="font-mono text-white">{v.ultima_alt_por || '—'}</b>{' '}
           <span className="font-mono text-sky-300">({fmtTs(v.ultima_alt_em)})</span>
         </span>
-        <div className="flex items-center gap-4 text-xs font-bold uppercase">
-          <button onClick={() => onEditar(v)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
-            <Pencil size={14} /> Editar
-          </button>
-          <button onClick={() => onApagar(v)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
-            <Trash2 size={14} /> Apagar
-          </button>
-        </div>
+        {podeEditar && (
+          <div className="flex items-center gap-4 text-xs font-bold uppercase">
+            <button onClick={() => onEditar(v)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
+              <Pencil size={14} /> Editar
+            </button>
+            <button onClick={() => onApagar(v)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
+              <Trash2 size={14} /> Apagar
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -773,17 +822,48 @@ function TelaConfig() {
   );
 }
 
-function TelaLogin({ onEntrar, online }) {
+function TelaLogin({ onEntrar, onSolicitar, online }) {
+  const [modo, setModo] = useState('entrar');
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
+  const [confirma, setConfirma] = useState('');
   const [erro, setErro] = useState('');
+  const [info, setInfo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [ver, setVer] = useState(false);
+  const solicitando = modo === 'solicitar';
+
+  const trocarModo = (m) => {
+    setModo(m);
+    setErro('');
+    setInfo('');
+    setSenha('');
+    setConfirma('');
+  };
 
   const enviar = async (e) => {
     e.preventDefault();
     setOcupado(true);
     setErro('');
+    setInfo('');
+    if (solicitando) {
+      if (senha !== confirma) {
+        setErro('As senhas não conferem.');
+        setOcupado(false);
+        return;
+      }
+      const r = await onSolicitar(nome, senha);
+      if (r) {
+        setErro(r);
+      } else {
+        setInfo('Solicitação enviada! Aguarde a aprovação do administrador para entrar.');
+        setSenha('');
+        setConfirma('');
+        setModo('entrar');
+      }
+      setOcupado(false);
+      return;
+    }
     const r = await onEntrar(nome, senha);
     if (r) {
       setErro(r);
@@ -807,7 +887,12 @@ function TelaLogin({ onEntrar, online }) {
               <p className="text-[10px] uppercase text-slate-400">Posto CAN BR — Base Aérea de Brasília</p>
             </div>
           </div>
-          <Campo rotulo="Utilizador">
+
+          <div className="text-xs font-bold uppercase text-sky-400">
+            {solicitando ? 'Solicitar acesso ao sistema' : 'Acesso restrito'}
+          </div>
+
+          <Campo rotulo={solicitando ? 'Seu nome (ex: 2S OLIVEIRA)' : 'Utilizador'}>
             <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: CAIO" autoCapitalize="characters" required />
           </Campo>
           <Campo rotulo="Senha">
@@ -830,10 +915,30 @@ function TelaLogin({ onEntrar, online }) {
               </button>
             </div>
           </Campo>
+          {solicitando && (
+            <Campo rotulo="Confirmar senha">
+              <input
+                type={ver ? 'text' : 'password'}
+                className={`${C.input} sem-caixa`}
+                value={confirma}
+                onChange={(e) => setConfirma(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </Campo>
+          )}
           {erro && <p className="text-xs font-bold text-rose-400">{erro}</p>}
+          {info && <p className="text-xs font-bold text-emerald-400">{info}</p>}
           {!online && <p className="text-xs text-amber-400">A ligar ao servidor… se demorar, verifique a internet.</p>}
           <button type="submit" disabled={ocupado} className={`${C.botao} w-full`}>
-            {ocupado ? 'A entrar…' : 'Entrar'}
+            {ocupado ? 'Aguarde…' : solicitando ? 'Enviar solicitação' : 'Entrar'}
+          </button>
+          <button
+            type="button"
+            onClick={() => trocarModo(solicitando ? 'entrar' : 'solicitar')}
+            className="w-full text-center text-[11px] font-bold uppercase text-sky-400 underline"
+          >
+            {solicitando ? 'Já tenho acesso — voltar ao login' : 'Não tenho acesso — solicitar ao administrador'}
           </button>
         </form>
       </div>
@@ -996,9 +1101,13 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
   );
 }
 
-function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
+function TelaPainel({ voos, aeronaves, onEditar, onApagar, podeEditar }) {
   const filtro = useFiltro();
   const lista = useMemo(() => filtrarVoos(voos, filtro.aplicado), [voos, filtro.aplicado]);
+  const localidades = useMemo(
+    () => [...new Set(voos.flatMap((v) => codigosRota(v.rota)))].filter((c) => c !== 'SBBR').sort(),
+    [voos]
+  );
   return (
     <div className="space-y-6">
       <div className={`${C.painel} space-y-4 p-5`}>
@@ -1007,6 +1116,20 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} />
+        </div>
+        <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-4 lg:grid-cols-2">
+          <Campo rotulo="Filtrar pax por localidade / destino">
+            <select
+              className={C.input}
+              value={filtro.rascunho.local}
+              onChange={(e) => filtro.setRascunho({ ...filtro.rascunho, local: e.target.value })}
+            >
+              <option value="">TODAS AS LOCALIDADES (GERAL)</option>
+              {localidades.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </Campo>
         </div>
         <BotoesFiltro filtro={filtro} />
       </div>
@@ -1019,7 +1142,7 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
       ) : (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           {lista.map((v) => (
-            <CartaoVoo key={v.id} v={v} onEditar={onEditar} onApagar={onApagar} />
+            <CartaoVoo key={v.id} v={v} onEditar={onEditar} onApagar={onApagar} podeEditar={podeEditar} />
           ))}
         </div>
       )}
@@ -1207,7 +1330,7 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
 
 const NOVO_DESEMB = () => ({ aeronave: '', matricula: '', rota: '', data_voo: hoje(), desembarcados: '' });
 
-function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }) {
+function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, podeEditar }) {
   const filtro = useFiltro();
   const [f, setF] = useState(NOVO_DESEMB);
   const [editando, setEditando] = useState(null);
@@ -1259,6 +1382,7 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      {podeEditar && (
       <form ref={formRef} onSubmit={enviar} className={`${C.painel} space-y-4 p-5`}>
         <div className="flex items-center justify-between">
           <div className={C.titulo}>
@@ -1316,6 +1440,7 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
           {salvando ? 'A guardar…' : editando ? 'Salvar alterações do desembarque' : 'Incluir voo de desembarque'}
         </button>
       </form>
+      )}
 
       <div className={`${C.painel} space-y-4 p-5`}>
         <div className={C.titulo}>
@@ -1344,11 +1469,14 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
           {lista.map((d) => (
             <div key={d.id} className={`${C.painel} space-y-3 p-5`}>
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold uppercase text-sky-400">{d.aeronave}</h3>
-                  <p className="mt-1 text-[11px] uppercase text-slate-400">
-                    Matrícula: <b className="font-mono text-white">{d.matricula || 'N/D'}</b>
-                  </p>
+                <div className="flex items-center gap-3">
+                  <IconeAeronave modelo={d.aeronave} className="w-16" />
+                  <div>
+                    <h3 className="text-sm font-bold uppercase text-sky-400">{d.aeronave}</h3>
+                    <p className="mt-1 text-[11px] uppercase text-slate-400">
+                      Matrícula: <b className="font-mono text-white">{d.matricula || 'N/D'}</b>
+                    </p>
+                  </div>
                 </div>
                 <div className="text-right">
                   <span className="inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">
@@ -1366,14 +1494,16 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
                   Última alt. por: <b className="font-mono text-white">{d.ultima_alt_por || '—'}</b>{' '}
                   <span className="font-mono text-sky-300">({fmtTs(d.ultima_alt_em)})</span>
                 </span>
-                <div className="flex items-center gap-4 text-[11px] font-bold uppercase">
-                  <button onClick={() => editar(d)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
-                    <Pencil size={13} /> Editar
-                  </button>
-                  <button onClick={() => onApagar(d)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
-                    <Trash2 size={13} /> Apagar
-                  </button>
-                </div>
+                {podeEditar && (
+                  <div className="flex items-center gap-4 text-[11px] font-bold uppercase">
+                    <button onClick={() => editar(d)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
+                      <Pencil size={13} /> Editar
+                    </button>
+                    <button onClick={() => onApagar(d)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
+                      <Trash2 size={13} /> Apagar
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -1406,7 +1536,10 @@ function TelaAeronaves({ aeronaves, onAdicionar, onRemover }) {
         <h3 className="text-xs font-bold uppercase text-white">Aeronaves registradas:</h3>
         {aeronaves.map((a) => (
           <div key={a.id} className={`${C.caixa} flex items-center justify-between px-3 py-3`}>
-            <span className="font-mono text-xs font-bold uppercase text-sky-300">{a.modelo}</span>
+            <span className="flex items-center gap-3 font-mono text-xs font-bold uppercase text-sky-300">
+              <IconeAeronave modelo={a.modelo} className="w-16" />
+              {a.modelo}
+            </span>
             <div className="flex items-center gap-3">
               <ShieldCheck size={15} className="text-emerald-400" />
               <button onClick={() => onRemover(a)} className="text-rose-400 hover:text-rose-300" title="Remover">
@@ -1550,11 +1683,19 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
   );
 }
 
-function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover }) {
+const OPCOES_PERFIL = [
+  ['admin', 'ADMINISTRADOR'],
+  ['operador', 'OPERADOR'],
+  ['observador', 'OBSERVADOR (SÓ VISUALIZA)']
+];
+
+function TelaUsuarios({ usuario, usuarios, pendentes, onSenha, onCriar, onRemover, onAprovar, onRecusar, onPerfil }) {
   const [novaSenha, setNovaSenha] = useState('');
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [perfil, setPerfil] = useState('operador');
+  const [escolhas, setEscolhas] = useState({});
+  const aprovados = usuarios.filter((u) => u.aprovado !== false);
 
   const trocar = async () => {
     if (await onSenha(novaSenha)) setNovaSenha('');
@@ -1570,19 +1711,60 @@ function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover }) {
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
+      {pendentes.length > 0 && (
+        <div className={`${C.painel} space-y-3 border-amber-700/60 p-6`}>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase text-amber-400">
+            <AlertTriangle size={15} /> Solicitações de acesso pendentes ({pendentes.length})
+          </div>
+          {pendentes.map((u) => (
+            <div key={u.id} className={`${C.caixa} space-y-3 p-3`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</span>
+                <span className="font-mono text-[10px] text-slate-500">{fmtTs(u.criado_em)}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  className={`${C.input} min-w-[160px] flex-1`}
+                  value={escolhas[u.id] || 'observador'}
+                  onChange={(e) => setEscolhas((s) => ({ ...s, [u.id]: e.target.value }))}
+                >
+                  {OPCOES_PERFIL.map(([v, r]) => (
+                    <option key={v} value={v}>{r}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => onAprovar(u, escolhas[u.id] || 'observador')}
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-bold uppercase text-white hover:bg-emerald-500"
+                >
+                  Aprovar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRecusar(u)}
+                  className="rounded-xl border border-rose-800 px-4 py-3 text-xs font-bold uppercase text-rose-400 hover:bg-rose-950/40"
+                >
+                  Recusar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className={`${C.painel} space-y-4 p-6`}>
         <div className={C.titulo}>
-          <KeyRound size={15} /> Segurança e senha do administrador {usuario.nome}
+          <KeyRound size={15} /> Segurança e senha de {usuario.nome}
         </div>
-        <Campo rotulo={`Nova senha para o administrador ${usuario.nome}`}>
+        <Campo rotulo={`Nova senha para ${usuario.nome}`}>
           <input type="password" className={C.input} value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="DIGITE A NOVA SENHA" />
         </Campo>
-        <button onClick={trocar} className={`${C.botao} w-full`}>Atualizar senha do administrador</button>
+        <button onClick={trocar} className={`${C.botao} w-full`}>Atualizar senha</button>
       </div>
 
       <form onSubmit={criar} className={`${C.painel} space-y-4 p-6`}>
         <div className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-400">
-          <UserPlus size={15} /> Cadastrar novo utilizador / operador
+          <UserPlus size={15} /> Cadastrar novo utilizador
         </div>
         <Campo rotulo="Nome do utilizador">
           <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: 2S OLIVEIRA" required />
@@ -1590,34 +1772,51 @@ function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover }) {
         <Campo rotulo="Senha de acesso">
           <input type="password" className={C.input} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="MÍNIMO 6 CARACTERES" required />
         </Campo>
-        <Campo rotulo="Perfil (operador ou administrador)">
+        <Campo rotulo="Perfil de acesso">
           <select className={C.input} value={perfil} onChange={(e) => setPerfil(e.target.value)}>
-            <option value="operador">OPERADOR</option>
-            <option value="admin">ADMINISTRADOR</option>
+            {OPCOES_PERFIL.map(([v, r]) => (
+              <option key={v} value={v}>{r}</option>
+            ))}
           </select>
         </Campo>
+        <div className={`${C.caixa} space-y-1 p-3 text-[10px] leading-relaxed text-slate-400`}>
+          <p><b className="text-sky-300">ADMINISTRADOR:</b> acesso total, aprova utilizadores, lixeira e perfis.</p>
+          <p><b className="text-emerald-300">OPERADOR:</b> cadastra, edita e exclui voos, desembarques e aeronaves.</p>
+          <p><b className="text-amber-300">OBSERVADOR:</b> apenas visualiza o app (sem cadastrar, editar ou excluir).</p>
+        </div>
         <button type="submit" className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-bold uppercase text-white hover:bg-emerald-500">
           Cadastrar utilizador
         </button>
-        <div className="space-y-2 border-t border-slate-800 pt-4">
-          <h3 className="text-xs font-bold uppercase text-white">Utilizadores cadastrados:</h3>
-          {usuarios.map((u) => (
-            <div key={u.id} className={`${C.caixa} flex items-center justify-between px-3 py-3`}>
-              <span className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</span>
-              <div className="flex items-center gap-3">
-                <span className="rounded border border-sky-800 bg-sky-950/50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300">
-                  {u.perfil === 'admin' ? 'Admin' : 'Operador'}
-                </span>
-                {u.id !== usuario.id && (
-                  <button type="button" onClick={() => onRemover(u)} className="text-rose-400 hover:text-rose-300" title="Remover">
-                    <Trash2 size={15} />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
       </form>
+
+      <div className={`${C.painel} space-y-2 p-6`}>
+        <h3 className="text-xs font-bold uppercase text-white">Utilizadores cadastrados ({aprovados.length}):</h3>
+        {aprovados.map((u) => (
+          <div key={u.id} className={`${C.caixa} flex flex-wrap items-center justify-between gap-2 px-3 py-3`}>
+            <span className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</span>
+            {u.id === usuario.id ? (
+              <span className="rounded border border-sky-800 bg-sky-950/50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300">
+                {PERFIS[u.perfil] || u.perfil} (você)
+              </span>
+            ) : (
+              <div className="flex items-center gap-3">
+                <select
+                  className="rounded-lg border border-slate-700 bg-[#0c1424] px-2 py-1.5 font-mono text-[10px] uppercase text-slate-200 [color-scheme:dark]"
+                  value={u.perfil}
+                  onChange={(e) => onPerfil(u, e.target.value)}
+                >
+                  {OPCOES_PERFIL.map(([v, r]) => (
+                    <option key={v} value={v}>{r}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => onRemover(u)} className="text-rose-400 hover:text-rose-300" title="Remover acesso">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1638,11 +1837,14 @@ function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
           {voos.map((v) => (
             <div key={v.id} className={`${C.painel} space-y-4 p-5`}>
               <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</h3>
-                  <p className="mt-1 text-[11px] uppercase text-slate-400">
-                    Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
-                  </p>
+                <div className="flex items-center gap-3">
+                  <IconeAeronave modelo={v.aeronave} className="w-16" />
+                  <div>
+                    <h3 className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</h3>
+                    <p className="mt-1 text-[11px] uppercase text-slate-400">
+                      Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
+                    </p>
+                  </div>
                 </div>
                 <div className="text-right">
                   <span className="rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">{v.rota || '—'}</span>
@@ -1680,9 +1882,9 @@ function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
 const MENU = [
   { id: 'dashboard', rotulo: 'Dashboard', Icone: BarChart3 },
   { id: 'voos', rotulo: 'Painel de Voos', Icone: Database },
-  { id: 'adicionar', rotulo: 'Adicionar Voo', Icone: PlusCircle },
+  { id: 'adicionar', rotulo: 'Adicionar Voo', Icone: PlusCircle, edita: true },
   { id: 'desembarque', rotulo: 'Desembarque', Icone: UserCheck },
-  { id: 'aeronaves', rotulo: 'Adicionar Aeronave', Icone: Plane },
+  { id: 'aeronaves', rotulo: 'Adicionar Aeronave', Icone: Plane, edita: true },
   { id: 'relatorio', rotulo: 'Imprimir Relatório', Icone: Printer },
   { id: 'usuarios', rotulo: 'Utilizadores', Icone: Users, admin: true },
   { id: 'lixeira', rotulo: 'Lixeira', Icone: Trash2, admin: true }
@@ -1718,7 +1920,7 @@ export default function App() {
         supabase.from('voos').select('*').order('data_voo', { ascending: false }).order('criado_em', { ascending: false }),
         supabase.from('desembarques').select('*').order('data_voo', { ascending: false }).order('criado_em', { ascending: false }),
         supabase.from('aeronaves').select('*').order('modelo'),
-        supabase.from('usuarios').select('id,nome,perfil,criado_em').order('nome')
+        supabase.from('usuarios').select('id,nome,perfil,aprovado,criado_em').order('nome')
       ]);
       if (v.error || d.error || a.error || u.error) {
         setOnline(false);
@@ -1778,15 +1980,24 @@ export default function App() {
 
   // Se o utilizador logado foi removido, encerra a sessão
   useEffect(() => {
-    if (usuario && !carregando && usuarios.length > 0 && !usuarios.some((u) => u.id === usuario.id)) sair();
+    if (usuario && !carregando && usuarios.length > 0 && !usuarios.some((u) => u.id === usuario.id && u.aprovado !== false)) sair();
   }, [usuario, usuarios, carregando, sair]);
 
   const ativos = useMemo(() => voos.filter((v) => !v.excluido), [voos]);
   const lixeira = useMemo(() => voos.filter((v) => v.excluido), [voos]);
-  const ehAdmin = usuario?.perfil === 'admin';
+  // O perfil vem sempre do banco (se o admin mudar, vale na hora)
+  const eu = usuarios.find((u) => u.id === usuario?.id);
+  const perfil = eu?.perfil || usuario?.perfil;
+  const ehAdmin = perfil === 'admin';
+  const podeEditar = perfil === 'admin' || perfil === 'operador';
+  const pendentes = usuarios.filter((u) => u.aprovado === false);
 
   /* ---------- ações ---------- */
   const gravar = async (consulta, msgOk) => {
+    if (!podeEditar) {
+      avisar('Seu perfil (Observador) permite apenas visualizar.', 'erro');
+      return false;
+    }
     const { error } = await consulta;
     if (error) {
       avisar(error.code === '23505' ? 'Já existe um registo com esse nome.' : `Erro: ${error.message}`, 'erro');
@@ -1801,12 +2012,13 @@ export default function App() {
   const entrar = async (nome, senha) => {
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id,nome,perfil,senha_hash')
+      .select('id,nome,perfil,senha_hash,aprovado')
       .eq('nome', nome.trim().toUpperCase())
       .maybeSingle();
     if (error) return 'Falha de ligação ao servidor. Tente novamente.';
     if (!data) return 'Utilizador ou senha inválidos.';
     if ((await hashSenha(nome, senha)) !== data.senha_hash) return 'Utilizador ou senha inválidos.';
+    if (data.aprovado === false) return 'Seu acesso ainda aguarda a aprovação do administrador.';
     const sessao = { id: data.id, nome: data.nome, perfil: data.perfil };
     setUsuario(sessao);
     gravarLocal('flightops_sessao', sessao);
@@ -1903,6 +2115,37 @@ export default function App() {
       aoConfirmar: () => gravar(supabase.from('usuarios').delete().eq('id', u.id), 'Utilizador removido.')
     });
 
+  const solicitarAcesso = async (nome, senha) => {
+    const n = nome.trim().toUpperCase();
+    if (n.length < 3) return 'Informe seu nome (mínimo 3 caracteres).';
+    if (senha.length < 6) return 'A senha deve ter no mínimo 6 caracteres.';
+    const senha_hash = await hashSenha(n, senha);
+    const { error } = await supabase
+      .from('usuarios')
+      .insert({ nome: n, senha_hash, perfil: 'observador', aprovado: false });
+    if (error) {
+      return error.code === '23505'
+        ? 'Já existe um utilizador ou solicitação com esse nome.'
+        : 'Não foi possível enviar a solicitação. Tente novamente.';
+    }
+    return null;
+  };
+
+  const aprovarUsuario = (u, novoPerfil) =>
+    gravar(
+      supabase.from('usuarios').update({ aprovado: true, perfil: novoPerfil }).eq('id', u.id),
+      `${u.nome} aprovado como ${PERFIS[novoPerfil]}.`
+    );
+  const pedirRecusa = (u) =>
+    setConfirmacao({
+      titulo: 'Recusar solicitação?',
+      texto: `A solicitação de acesso de ${u.nome} será excluída.`,
+      botao: 'Sim, recusar',
+      aoConfirmar: () => gravar(supabase.from('usuarios').delete().eq('id', u.id), 'Solicitação recusada.')
+    });
+  const alterarPerfil = (u, novoPerfil) =>
+    gravar(supabase.from('usuarios').update({ perfil: novoPerfil }).eq('id', u.id), `Perfil de ${u.nome} alterado para ${PERFIS[novoPerfil]}.`);
+
   const ir = (id) => {
     if (id === 'adicionar') setVooEditando(null);
     setAba(id);
@@ -1915,9 +2158,9 @@ export default function App() {
 
   /* ---------- renderização ---------- */
   if (!supabaseConfigurado) return <TelaConfig />;
-  if (!usuario) return <TelaLogin onEntrar={entrar} online={online} />;
+  if (!usuario) return <TelaLogin onEntrar={entrar} onSolicitar={solicitarAcesso} online={online} />;
 
-  const abaAtual = MENU.find((m) => m.id === aba && (!m.admin || ehAdmin)) ? aba : 'dashboard';
+  const abaAtual = MENU.find((m) => m.id === aba && (!m.admin || ehAdmin) && (!m.edita || podeEditar)) ? aba : 'dashboard';
 
   return (
     <>
@@ -1968,7 +2211,7 @@ export default function App() {
               className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-sky-300 hover:bg-slate-800"
               title="Sair"
             >
-              {usuario.nome} ({usuario.perfil === 'admin' ? 'Admin' : 'Operador'}) <LogOut size={14} className="text-rose-400" />
+              {usuario.nome} ({PERFIS[perfil] || perfil}) <LogOut size={14} className="text-rose-400" />
             </button>
           </div>
         </header>
@@ -1980,7 +2223,7 @@ export default function App() {
           {menuAberto && (
             <aside className="absolute left-0 top-0 z-30 flex h-full w-60 shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0a1120] p-3 lg:static">
               <nav className="space-y-1">
-                {MENU.filter((m) => !m.admin || ehAdmin).map(({ id, rotulo, Icone }) => (
+                {MENU.filter((m) => (!m.admin || ehAdmin) && (!m.edita || podeEditar)).map(({ id, rotulo, Icone }) => (
                   <button
                     key={id}
                     onClick={() => ir(id)}
@@ -1990,6 +2233,9 @@ export default function App() {
                   >
                     <Icone size={16} />
                     <span className="flex-1">{rotulo}</span>
+                    {id === 'usuarios' && pendentes.length > 0 && (
+                      <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-slate-900">{pendentes.length}</span>
+                    )}
                     {id === 'lixeira' && lixeira.length > 0 && (
                       <span className="rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white">{lixeira.length}</span>
                     )}
@@ -2012,7 +2258,7 @@ export default function App() {
             ) : (
               <>
                 {abaAtual === 'dashboard' && <TelaDashboard voos={ativos} desembarques={desembarques} aeronaves={aeronaves} />}
-                {abaAtual === 'voos' && <TelaPainel voos={ativos} aeronaves={aeronaves} onEditar={editar} onApagar={pedirExclusao} />}
+                {abaAtual === 'voos' && <TelaPainel voos={ativos} aeronaves={aeronaves} onEditar={editar} onApagar={pedirExclusao} podeEditar={podeEditar} />}
                 {abaAtual === 'adicionar' && (
                   <FormVoo
                     key={vooEditando?.id || 'novo'}
@@ -2033,12 +2279,23 @@ export default function App() {
                     onSalvar={salvarDesemb}
                     onApagar={pedirExclusaoDesemb}
                     avisar={avisar}
+                    podeEditar={podeEditar}
                   />
                 )}
                 {abaAtual === 'aeronaves' && <TelaAeronaves aeronaves={aeronaves} onAdicionar={adicionarAeronave} onRemover={pedirRemoverAeronave} />}
                 {abaAtual === 'relatorio' && <TelaRelatorio voos={ativos} desembarques={desembarques} aeronaves={aeronaves} />}
                 {abaAtual === 'usuarios' && (
-                  <TelaUsuarios usuario={usuario} usuarios={usuarios} onSenha={trocarSenha} onCriar={criarUsuario} onRemover={pedirRemoverUsuario} />
+                  <TelaUsuarios
+                    usuario={usuario}
+                    usuarios={usuarios}
+                    pendentes={pendentes}
+                    onSenha={trocarSenha}
+                    onCriar={criarUsuario}
+                    onRemover={pedirRemoverUsuario}
+                    onAprovar={aprovarUsuario}
+                    onRecusar={pedirRecusa}
+                    onPerfil={alterarPerfil}
+                  />
                 )}
                 {abaAtual === 'lixeira' && <TelaLixeira voos={lixeira} onRestaurar={restaurarVoo} onExcluirDef={pedirExclusaoDefinitiva} />}
               </>

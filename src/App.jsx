@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BarChart3, Database, PlusCircle, UserCheck, Plane, Printer, Users, ChevronLeft,
   Menu, LogOut, Filter, PieChart, Pencil, Trash2, CalendarDays, Zap,
-  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle
+  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle, Eye, EyeOff
 } from 'lucide-react';
 import { supabase, supabaseConfigurado } from './supabase.js';
 
@@ -201,8 +201,41 @@ function CamposFiltro({ f, setF, aeronaves, comMes = true, rotulos = {} }) {
   );
 }
 
-function CartaoMetrica({ titulo, total, unidade, tema, dados }) {
+const PALETA = ['#38bdf8', '#34d399', '#a78bfa', '#fbbf24', '#fb7185', '#22d3ee', '#f472b6', '#a3e635'];
+
+function CartaoMetrica({ titulo, total, unidade, tema, dados, destaque, onSelecionar }) {
+  const [modo, setModo] = useState('barras');
+  const [hover, setHover] = useState('');
+  const [pronto, setPronto] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setPronto(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+
   const max = Math.max(...dados.map((d) => d.valor), 1);
+  const soma = dados.reduce((s, d) => s + d.valor, 0);
+  const pct = (v) => (soma ? ((v / soma) * 100).toFixed(1).replace('.', ',') : '0,0');
+  const foco = hover || destaque || '';
+  const itemFoco = dados.find((d) => d.nome === foco);
+  const apagado = (d) => foco && d.nome !== foco;
+  const sufixo = unidade ? ` ${unidade}` : '';
+
+  const eventos = (d) => ({
+    onMouseEnter: () => setHover(d.nome),
+    onMouseLeave: () => setHover(''),
+    onClick: () => onSelecionar && onSelecionar(d.nome)
+  });
+
+  const R = 42;
+  const CIRC = 2 * Math.PI * R;
+  let acumulado = 0;
+  const fatias = dados.map((d, i) => {
+    const len = soma ? (d.valor / soma) * CIRC : 0;
+    const fatia = { d, i, len, off: acumulado };
+    acumulado += len;
+    return fatia;
+  });
+
   return (
     <div className={`${C.painel} p-5`}>
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -212,21 +245,115 @@ function CartaoMetrica({ titulo, total, unidade, tema, dados }) {
           {unidade && <small className="ml-1 text-base">{unidade}</small>}
         </span>
       </div>
-      <div className={`${C.caixa} mt-4 flex h-40 items-end justify-center gap-4 overflow-x-auto px-4 pt-3`}>
-        {dados.length === 0 ? (
-          <span className="self-center text-[11px] uppercase text-slate-600">Sem dados</span>
-        ) : (
-          dados.map((d) => (
-            <div key={d.rotulo} className="flex h-full min-w-[48px] flex-col items-center justify-end pb-1">
-              <div
-                className={`flex w-12 items-center justify-center rounded-t-lg bg-gradient-to-b ${tema.barra} font-mono text-[10px] font-bold text-slate-900`}
-                style={{ height: `${Math.max((d.valor / max) * 78, 14)}%` }}
+
+      <div className="mt-3 flex gap-2">
+        {[
+          ['barras', 'Barras', BarChart3],
+          ['rosca', 'Rosca', PieChart]
+        ].map(([id, rot, Ic]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setModo(id)}
+            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[10px] font-bold uppercase transition ${
+              modo === id ? 'border-sky-500 bg-sky-950/50 text-sky-300' : 'border-slate-700 text-slate-400 hover:bg-slate-800'
+            }`}
+          >
+            <Ic size={11} /> {rot}
+          </button>
+        ))}
+      </div>
+
+      {modo === 'barras' ? (
+        <div className={`${C.caixa} mt-3 flex h-40 items-end justify-center gap-4 overflow-x-auto px-4 pt-3`}>
+          {dados.length === 0 ? (
+            <span className="self-center text-[11px] uppercase text-slate-600">Sem dados</span>
+          ) : (
+            dados.map((d) => (
+              <button
+                key={d.nome}
+                type="button"
+                {...eventos(d)}
+                className={`flex h-full min-w-[48px] flex-col items-center justify-end pb-1 transition-opacity duration-200 ${
+                  apagado(d) ? 'opacity-30' : 'opacity-100'
+                }`}
               >
-                {d.valor}
+                <div
+                  className={`flex w-12 items-start justify-center overflow-hidden rounded-t-lg bg-gradient-to-b ${tema.barra} pt-0.5 font-mono text-[10px] font-bold text-slate-900 transition-all duration-700 ease-out hover:brightness-125 ${
+                    d.nome === destaque ? 'ring-2 ring-white' : ''
+                  }`}
+                  style={{ height: pronto ? `${Math.max((d.valor / max) * 78, 14)}%` : '0%' }}
+                >
+                  {d.valor}
+                </div>
+                <span className="max-w-[60px] truncate pt-1 text-[9px] uppercase text-slate-500">{d.rotulo}</span>
+              </button>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className={`${C.caixa} mt-3 flex h-40 items-center justify-center gap-5 px-4`}>
+          {soma === 0 ? (
+            <span className="text-[11px] uppercase text-slate-600">Sem dados</span>
+          ) : (
+            <>
+              <div className="relative h-32 w-32 shrink-0">
+                <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                  <circle cx="60" cy="60" r={R} fill="none" stroke="#1e293b" strokeWidth="16" />
+                  {fatias.map(({ d, i, len, off }) => (
+                    <circle
+                      key={d.nome}
+                      cx="60"
+                      cy="60"
+                      r={R}
+                      fill="none"
+                      stroke={PALETA[i % PALETA.length]}
+                      strokeWidth={d.nome === foco ? 20 : 16}
+                      strokeDasharray={`${pronto ? len : 0} ${CIRC}`}
+                      strokeDashoffset={-off}
+                      className="cursor-pointer transition-all duration-700"
+                      style={{ opacity: apagado(d) ? 0.3 : 1 }}
+                      {...eventos(d)}
+                    />
+                  ))}
+                </svg>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="font-mono text-sm font-extrabold text-white">{itemFoco ? itemFoco.valor : total}</span>
+                  <span className="text-[9px] uppercase text-slate-500">{itemFoco ? `${pct(itemFoco.valor)}%` : 'total'}</span>
+                </div>
               </div>
-              <span className="max-w-[60px] truncate pt-1 text-[9px] uppercase text-slate-500">{d.rotulo}</span>
-            </div>
-          ))
+              <div className="flex max-h-32 min-w-0 flex-col gap-1 overflow-y-auto">
+                {fatias.map(({ d, i }) => (
+                  <button
+                    key={d.nome}
+                    type="button"
+                    {...eventos(d)}
+                    className={`flex items-center gap-2 text-left text-[10px] uppercase transition-opacity ${
+                      apagado(d) ? 'opacity-30' : 'opacity-100'
+                    }`}
+                  >
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: PALETA[i % PALETA.length] }} />
+                    <span className="truncate text-slate-300">{d.nome}</span>
+                    <span className="font-mono text-slate-500">{pct(d.valor)}%</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="mt-3 flex min-h-[20px] items-center justify-between gap-2 text-[11px] uppercase">
+        {itemFoco ? (
+          <>
+            <span className="truncate font-bold text-white">{itemFoco.nome}</span>
+            <span className={`shrink-0 font-mono font-bold ${tema.texto}`}>
+              {itemFoco.valor}
+              {sufixo} · {pct(itemFoco.valor)}%
+            </span>
+          </>
+        ) : (
+          <span className="text-slate-600">Passe o mouse ou toque para ver detalhes · clique para destacar</span>
         )}
       </div>
     </div>
@@ -377,6 +504,7 @@ function TelaLogin({ onEntrar, online }) {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [ver, setVer] = useState(false);
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -407,7 +535,24 @@ function TelaLogin({ onEntrar, online }) {
           <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: CAIO" autoCapitalize="characters" required />
         </Campo>
         <Campo rotulo="Senha">
-          <input type="password" className={C.input} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••••" required />
+          <div className="relative">
+            <input
+              type={ver ? 'text' : 'password'}
+              className={`${C.input} pr-11`}
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setVer((v) => !v)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-sky-400"
+              aria-label={ver ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              {ver ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
         </Campo>
         {erro && <p className="text-xs font-bold text-rose-400">{erro}</p>}
         {!online && <p className="text-xs text-amber-400">A ligar ao servidor… se demorar, verifique a internet.</p>}
@@ -422,6 +567,7 @@ function TelaLogin({ onEntrar, online }) {
 function TelaDashboard({ voos, aeronaves }) {
   const [f, setF] = useState(FILTRO_VAZIO);
   const [mostrarEstat, setMostrarEstat] = useState(false);
+  const [destaque, setDestaque] = useState('');
   const filtrados = useMemo(() => filtrarVoos(voos, f), [voos, f]);
 
   const localidades = useMemo(
@@ -452,8 +598,20 @@ function TelaDashboard({ voos, aeronaves }) {
     });
   }, [filtrados]);
 
-  const dados = (campo) => grupos.map((g) => ({ rotulo: g.aeronave.split(' ')[0], valor: g[campo] }));
+  const gd = grupos.find((g) => g.aeronave === destaque);
+  const alternar = (nome) => setDestaque((d) => (d === nome ? '' : nome));
+  const dados = (campo) =>
+    grupos.map((g) => ({ rotulo: g.aeronave.split(' ')[0], nome: g.aeronave, valor: g[campo] }));
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+
+  const cartoes = [
+    ['Total de voos', filtrados.length, '', TEMAS.sky, 'voos'],
+    ['Total de passageiros (PAX)', somar(filtrados, 'pax'), '', TEMAS.emerald, 'pax'],
+    ['Total desembarcados', somar(filtrados, 'desembarcados'), '', TEMAS.cyan, 'desemb'],
+    ['Peso total pax', somar(filtrados, 'peso_pax'), 'KG', TEMAS.indigo, 'pesoPax'],
+    ['Peso total de bagagem', somar(filtrados, 'peso_bagagem'), 'KG', TEMAS.amber, 'bagagem'],
+    ['Peso total transp.', somar(filtrados, 'total_peso'), 'KG', TEMAS.rose, 'total']
+  ];
 
   return (
     <div className="space-y-6">
@@ -527,13 +685,40 @@ function TelaDashboard({ voos, aeronaves }) {
         </div>
       )}
 
+      {gd && (
+        <div className={`${C.painel} flex flex-wrap items-center gap-4 p-5`}>
+          <div>
+            <div className="text-[10px] uppercase text-slate-400">Aeronave em destaque</div>
+            <div className="text-sm font-extrabold uppercase text-sky-400">{gd.aeronave}</div>
+          </div>
+          <div className="grid min-w-[280px] flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            <Caixa rotulo="Voos" valor={gd.voos} />
+            <Caixa rotulo="Pax" valor={gd.pax} />
+            <Caixa rotulo="Desemb." valor={gd.desemb} />
+            <Caixa rotulo="Peso pax" valor={`${gd.pesoPax} KG`} />
+            <Caixa rotulo="Bagagem" valor={`${gd.bagagem} KG`} />
+            <Caixa rotulo="Total" valor={`${gd.total} KG`} destaque />
+            <Caixa rotulo="Efetividade" valor={fmtEf(gd.ef)} destaque />
+          </div>
+          <button onClick={() => setDestaque('')} className="text-[11px] font-bold uppercase text-rose-400 underline">
+            Limpar destaque
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-        <CartaoMetrica titulo="Total de voos" total={filtrados.length} tema={TEMAS.sky} dados={dados('voos')} />
-        <CartaoMetrica titulo="Total de passageiros (PAX)" total={somar(filtrados, 'pax')} tema={TEMAS.emerald} dados={dados('pax')} />
-        <CartaoMetrica titulo="Total desembarcados" total={somar(filtrados, 'desembarcados')} tema={TEMAS.cyan} dados={dados('desemb')} />
-        <CartaoMetrica titulo="Peso total pax" total={somar(filtrados, 'peso_pax')} unidade="KG" tema={TEMAS.indigo} dados={dados('pesoPax')} />
-        <CartaoMetrica titulo="Peso total de bagagem" total={somar(filtrados, 'peso_bagagem')} unidade="KG" tema={TEMAS.amber} dados={dados('bagagem')} />
-        <CartaoMetrica titulo="Peso total transp." total={somar(filtrados, 'total_peso')} unidade="KG" tema={TEMAS.rose} dados={dados('total')} />
+        {cartoes.map(([titulo, total, unidade, tema, campo]) => (
+          <CartaoMetrica
+            key={titulo}
+            titulo={titulo}
+            total={total}
+            unidade={unidade}
+            tema={tema}
+            dados={dados(campo)}
+            destaque={destaque}
+            onSelecionar={alternar}
+          />
+        ))}
       </div>
     </div>
   );

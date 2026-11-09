@@ -11,13 +11,15 @@ import { supabase, supabaseConfigurado } from './supabase.js';
    ESTILOS REUTILIZÁVEIS
    ================================================================ */
 const C = {
-  painel: 'rounded-2xl border border-slate-800 bg-[#0c1424]',
+  painel: 'rounded-2xl border border-slate-800 bg-[#0c1424]/90',
   caixa: 'rounded-xl border border-slate-800 bg-[#050a16]',
   input:
     'w-full rounded-xl border border-slate-800 bg-[#050a16] px-3 py-3 text-xs font-mono text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500 [color-scheme:dark]',
   label: 'block mb-1.5 text-[11px] uppercase tracking-wide text-slate-400',
   botao:
     'rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wide px-4 py-3 transition',
+  botaoSec:
+    'rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-300 hover:bg-slate-800 transition',
   titulo: 'flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-sky-400'
 };
 
@@ -139,9 +141,9 @@ const cruzar = (txtPrevisto, txtReal) => {
 };
 
 /* ---------------------------------------------------------------
-   FILTROS
+   FILTROS (valem para voos e para desembarques)
    --------------------------------------------------------------- */
-const FILTRO_VAZIO = { aeronave: '', inicial: '', final: '', data: '', mes: '', local: '', desemb: '' };
+const FILTRO_VAZIO = { aeronave: '', inicial: '', final: '', data: '', mes: '', local: '' };
 const codigosRota = (rota) => (rota || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 
 const filtrarVoos = (lista, f) =>
@@ -152,12 +154,164 @@ const filtrarVoos = (lista, f) =>
     if (f.data && v.data_voo !== f.data) return false;
     if (f.mes && !v.data_voo.startsWith(f.mes)) return false;
     if (f.local && !codigosRota(v.rota).includes(f.local)) return false;
-    if (f.desemb === 'com' && !(v.desembarcados > 0)) return false;
-    if (f.desemb === 'sem' && v.desembarcados > 0) return false;
     return true;
   });
 
 const somar = (lista, campo) => lista.reduce((s, v) => s + (Number(v[campo]) || 0), 0);
+
+// Os filtros só passam a valer quando o botão "Gerar filtros" é clicado
+function useFiltro() {
+  const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
+  const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
+  const pendente = JSON.stringify(rascunho) !== JSON.stringify(aplicado);
+  const gerar = () => setAplicado(rascunho);
+  const limpar = () => {
+    setRascunho(FILTRO_VAZIO);
+    setAplicado(FILTRO_VAZIO);
+  };
+  return { rascunho, setRascunho, aplicado, gerar, limpar, pendente };
+}
+
+/* ================================================================
+   FUNDO ANIMADO COM AERONAVES DA FAB
+   Desenhos estilizados em SVG. Para usar fotos reais, coloque os
+   arquivos na pasta public/avioes do projeto e preencha o campo
+   "foto" de cada aeronave, por exemplo: foto: '/avioes/kc390.png'
+   ================================================================ */
+const FUNDO = '#050a16';
+const traco = { stroke: FUNDO, strokeWidth: 1.6, strokeLinejoin: 'round' };
+
+const AVIOES = [
+  {
+    id: 'kc390',
+    nome: 'KC-390 Millennium',
+    foto: '',
+    desenho: (
+      <g {...traco}>
+        <path d="M84 26 L134 26 L110 3 L97 3 Z" />
+        <path d="M8 34 L28 25 L168 23 Q198 25 214 37 Q198 47 168 47 L30 47 Z" />
+        <path d="M12 34 L6 6 L26 6 L42 25 Z" />
+        <rect x="0" y="5" width="36" height="4" rx="1.5" />
+        <ellipse cx="110" cy="31" rx="14" ry="5.5" />
+      </g>
+    )
+  },
+  {
+    id: 'kc30',
+    nome: 'KC-30',
+    foto: '',
+    desenho: (
+      <g {...traco}>
+        <path d="M88 42 L142 42 L114 64 L100 64 Z" />
+        <path d="M4 36 L24 28 L178 26 Q208 28 218 38 Q204 47 178 47 L24 47 Z" />
+        <path d="M10 36 L4 4 L28 4 L46 28 Z" />
+        <path d="M20 41 L58 41 L34 53 L10 53 Z" />
+        <ellipse cx="118" cy="54" rx="15" ry="6" />
+        <rect x="0" y="45" width="26" height="3" />
+      </g>
+    )
+  },
+  {
+    id: 'c98',
+    nome: 'C-98',
+    foto: '',
+    desenho: (
+      <g {...traco}>
+        <path d="M78 25 L150 25 L140 10 L88 10 Z" />
+        <path d="M40 36 Q40 26 56 25 L150 25 Q172 26 182 36 Q170 45 150 45 L56 45 Q40 44 40 36 Z" />
+        <path d="M44 34 L38 12 L56 12 L66 26 Z" />
+        <path d="M104 25 L128 45" stroke="currentColor" strokeWidth="2" />
+        <ellipse cx="187" cy="37" rx="2.5" ry="14" />
+        <circle cx="150" cy="53" r="4" />
+        <circle cx="70" cy="50" r="3.5" />
+      </g>
+    )
+  },
+  {
+    id: 'c99',
+    nome: 'C-99',
+    foto: '',
+    desenho: (
+      <g {...traco}>
+        <path d="M92 40 L140 40 L112 56 L100 56 Z" />
+        <path d="M20 34 L36 28 L170 26 Q204 28 214 36 Q204 44 170 44 L40 44 Z" />
+        <path d="M24 34 L18 8 L38 8 L50 28 Z" />
+        <rect x="8" y="7" width="40" height="4" rx="1.5" />
+        <ellipse cx="52" cy="34" rx="16" ry="5" />
+      </g>
+    )
+  },
+  {
+    id: 'c105',
+    nome: 'C-105 Amazonas',
+    foto: '',
+    desenho: (
+      <g {...traco}>
+        <path d="M82 25 L146 25 L128 6 L98 6 Z" />
+        <path d="M10 33 L28 25 L160 24 Q184 26 194 36 Q182 46 160 46 L30 46 Z" />
+        <path d="M12 33 L8 8 L28 8 L40 25 Z" />
+        <rect x="2" y="7" width="38" height="4" rx="1.5" />
+        <ellipse cx="116" cy="32" rx="16" ry="6" />
+        <ellipse cx="134" cy="32" rx="2.5" ry="15" />
+      </g>
+    )
+  },
+  {
+    id: 'c97',
+    nome: 'C-97 Brasília',
+    foto: '',
+    desenho: (
+      <g {...traco}>
+        <path d="M84 40 L136 40 L112 54 L96 54 Z" />
+        <path d="M14 34 L30 29 L164 28 Q196 30 206 36 Q196 42 164 42 L32 42 Z" />
+        <path d="M16 34 L10 8 L30 8 L42 29 Z" />
+        <rect x="4" y="7" width="38" height="4" rx="1.5" />
+        <ellipse cx="112" cy="48" rx="15" ry="5" />
+        <ellipse cx="130" cy="48" rx="2.5" ry="13" />
+      </g>
+    )
+  }
+];
+
+function FundoAeronaves() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI((x) => (x + 1) % AVIOES.length), 22000);
+    return () => clearInterval(t);
+  }, []);
+  const a = AVIOES[i];
+  const altura = [12, 62, 28, 72, 20, 48][i % 6];
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#050a16]" aria-hidden="true">
+      <style>{`
+        @keyframes fundo-cruzar {
+          from { transform: translateX(-520px); }
+          to { transform: translateX(calc(100vw + 520px)); }
+        }
+        .fundo-aviao { left: 0; animation: fundo-cruzar 22s linear forwards; }
+        @media (prefers-reduced-motion: reduce) {
+          .fundo-aviao { animation: none; left: 35%; }
+        }
+      `}</style>
+      <div key={a.id} className="fundo-aviao absolute" style={{ top: `${altura}%` }}>
+        <div className="flex items-center">
+          <div className="h-[2px] w-40 bg-gradient-to-r from-transparent to-sky-400/25" />
+          <div className="w-[300px] text-sky-300">
+            {a.foto ? (
+              <img src={a.foto} alt={a.nome} className="w-full opacity-25" />
+            ) : (
+              <svg viewBox="0 0 220 70" className="w-full opacity-[0.16]" fill="currentColor">
+                {a.desenho}
+              </svg>
+            )}
+            <div className="mt-1 text-center font-mono text-[10px] uppercase tracking-widest text-sky-300/40">{a.nome}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ================================================================
    COMPONENTES PEQUENOS
@@ -198,6 +352,24 @@ function CamposFiltro({ f, setF, aeronaves, comMes = true, rotulos = {} }) {
         </Campo>
       )}
     </>
+  );
+}
+
+function BotoesFiltro({ filtro }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
+      <button type="button" onClick={filtro.gerar} className={`${C.botao} flex items-center gap-2`}>
+        <Filter size={14} /> Gerar filtros
+      </button>
+      <button type="button" onClick={filtro.limpar} className={C.botaoSec}>
+        Limpar
+      </button>
+      {filtro.pendente && (
+        <span className="text-[11px] font-bold uppercase text-amber-400">
+          Alterações ainda não aplicadas — clique em Gerar filtros
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -518,96 +690,99 @@ function TelaLogin({ onEntrar, online }) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#050a16] p-4 text-slate-200">
-      <form onSubmit={enviar} className={`${C.painel} w-full max-w-sm space-y-5 p-8`}>
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-sky-600 p-2.5 text-white">
-            <Plane size={22} />
+    <>
+      <FundoAeronaves />
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4 text-slate-200">
+        <form onSubmit={enviar} className={`${C.painel} w-full max-w-sm space-y-5 p-8`}>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-sky-600 p-2.5 text-white">
+              <Plane size={22} />
+            </div>
+            <div>
+              <h1 className="text-lg font-extrabold uppercase">
+                FlightOps <span className="text-sky-400">BSB</span>
+              </h1>
+              <p className="text-[10px] uppercase text-slate-400">Posto CAN BR — Base Aérea de Brasília</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-extrabold uppercase">
-              FlightOps <span className="text-sky-400">BSB</span>
-            </h1>
-            <p className="text-[10px] uppercase text-slate-400">Posto CAN BR — Base Aérea de Brasília</p>
-          </div>
-        </div>
-        <Campo rotulo="Utilizador">
-          <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: CAIO" autoCapitalize="characters" required />
-        </Campo>
-        <Campo rotulo="Senha">
-          <div className="relative">
-            <input
-              type={ver ? 'text' : 'password'}
-              className={`${C.input} pr-11`}
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setVer((v) => !v)}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-sky-400"
-              aria-label={ver ? 'Ocultar senha' : 'Mostrar senha'}
-            >
-              {ver ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-        </Campo>
-        {erro && <p className="text-xs font-bold text-rose-400">{erro}</p>}
-        {!online && <p className="text-xs text-amber-400">A ligar ao servidor… se demorar, verifique a internet.</p>}
-        <button type="submit" disabled={ocupado} className={`${C.botao} w-full`}>
-          {ocupado ? 'A entrar…' : 'Entrar'}
-        </button>
-      </form>
-    </div>
+          <Campo rotulo="Utilizador">
+            <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: CAIO" autoCapitalize="characters" required />
+          </Campo>
+          <Campo rotulo="Senha">
+            <div className="relative">
+              <input
+                type={ver ? 'text' : 'password'}
+                className={`${C.input} pr-11`}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setVer((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-sky-400"
+                aria-label={ver ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {ver ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </Campo>
+          {erro && <p className="text-xs font-bold text-rose-400">{erro}</p>}
+          {!online && <p className="text-xs text-amber-400">A ligar ao servidor… se demorar, verifique a internet.</p>}
+          <button type="submit" disabled={ocupado} className={`${C.botao} w-full`}>
+            {ocupado ? 'A entrar…' : 'Entrar'}
+          </button>
+        </form>
+      </div>
+    </>
   );
 }
 
-function TelaDashboard({ voos, aeronaves }) {
-  const [f, setF] = useState(FILTRO_VAZIO);
+function TelaDashboard({ voos, desembarques, aeronaves }) {
+  const filtro = useFiltro();
+  const f = filtro.aplicado;
   const [mostrarEstat, setMostrarEstat] = useState(false);
   const [destaque, setDestaque] = useState('');
   const filtrados = useMemo(() => filtrarVoos(voos, f), [voos, f]);
+  const filtDesemb = useMemo(() => filtrarVoos(desembarques, f), [desembarques, f]);
 
   const localidades = useMemo(
-    () => [...new Set(voos.flatMap((v) => codigosRota(v.rota)))].filter((c) => c !== 'SBBR').sort(),
-    [voos]
+    () => [...new Set([...voos, ...desembarques].flatMap((v) => codigosRota(v.rota)))].filter((c) => c !== 'SBBR').sort(),
+    [voos, desembarques]
   );
 
   const grupos = useMemo(() => {
-    const m = {};
-    filtrados.forEach((v) => {
-      if (!m[v.aeronave]) m[v.aeronave] = { aeronave: v.aeronave, lista: [] };
-      m[v.aeronave].lista.push(v);
-    });
-    return Object.values(m).map((g) => {
-      const efs = g.lista
+    const nomes = [...new Set([...filtrados.map((v) => v.aeronave), ...filtDesemb.map((d) => d.aeronave)])];
+    return nomes.map((nome) => {
+      const lv = filtrados.filter((v) => v.aeronave === nome);
+      const ld = filtDesemb.filter((d) => d.aeronave === nome);
+      const efs = lv
         .map((v) => calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real))
         .filter((e) => e !== null);
       return {
-        aeronave: g.aeronave,
-        voos: g.lista.length,
-        pax: somar(g.lista, 'pax'),
-        desemb: somar(g.lista, 'desembarcados'),
-        pesoPax: somar(g.lista, 'peso_pax'),
-        bagagem: somar(g.lista, 'peso_bagagem'),
-        total: somar(g.lista, 'total_peso'),
+        aeronave: nome,
+        voos: lv.length,
+        pax: somar(lv, 'pax'),
+        desemb: somar(ld, 'desembarcados'),
+        pesoPax: somar(lv, 'peso_pax'),
+        bagagem: somar(lv, 'peso_bagagem'),
+        total: somar(lv, 'total_peso'),
         ef: efs.length ? Math.round((efs.reduce((a, b) => a + b, 0) / efs.length) * 10) / 10 : null
       };
     });
-  }, [filtrados]);
+  }, [filtrados, filtDesemb]);
 
   const gd = grupos.find((g) => g.aeronave === destaque);
   const alternar = (nome) => setDestaque((d) => (d === nome ? '' : nome));
   const dados = (campo) =>
     grupos.map((g) => ({ rotulo: g.aeronave.split(' ')[0], nome: g.aeronave, valor: g[campo] }));
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const setLocal = (e) => filtro.setRascunho({ ...filtro.rascunho, local: e.target.value });
 
   const cartoes = [
     ['Total de voos', filtrados.length, '', TEMAS.sky, 'voos'],
     ['Total de passageiros (PAX)', somar(filtrados, 'pax'), '', TEMAS.emerald, 'pax'],
-    ['Total desembarcados', somar(filtrados, 'desembarcados'), '', TEMAS.cyan, 'desemb'],
+    ['Total desembarcados', somar(filtDesemb, 'desembarcados'), '', TEMAS.cyan, 'desemb'],
     ['Peso total pax', somar(filtrados, 'peso_pax'), 'KG', TEMAS.indigo, 'pesoPax'],
     ['Peso total de bagagem', somar(filtrados, 'peso_bagagem'), 'KG', TEMAS.amber, 'bagagem'],
     ['Peso total transp.', somar(filtrados, 'total_peso'), 'KG', TEMAS.rose, 'total']
@@ -620,25 +795,19 @@ function TelaDashboard({ voos, aeronaves }) {
           <Filter size={14} /> Filtros operacionais — Posto CAN BR
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <CamposFiltro f={f} setF={setF} aeronaves={aeronaves} />
+          <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} />
         </div>
         <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-4 lg:grid-cols-2">
           <Campo rotulo="Filtrar pax por localidade / destino">
-            <select className={C.input} value={f.local} onChange={set('local')}>
+            <select className={C.input} value={filtro.rascunho.local} onChange={setLocal}>
               <option value="">TODAS AS LOCALIDADES (GERAL)</option>
               {localidades.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </Campo>
-          <Campo rotulo="Filtrar por status de desembarque">
-            <select className={C.input} value={f.desemb} onChange={set('desemb')}>
-              <option value="">TODOS OS VOOS</option>
-              <option value="com">COM DESEMBARQUE REGISTRADO</option>
-              <option value="sem">SEM DESEMBARQUE REGISTRADO</option>
-            </select>
-          </Campo>
         </div>
+        <BotoesFiltro filtro={filtro} />
       </div>
 
       <div className={`${C.painel} flex flex-wrap items-center justify-between gap-4 p-5`}>
@@ -725,8 +894,8 @@ function TelaDashboard({ voos, aeronaves }) {
 }
 
 function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
-  const [f, setF] = useState(FILTRO_VAZIO);
-  const lista = useMemo(() => filtrarVoos(voos, f), [voos, f]);
+  const filtro = useFiltro();
+  const lista = useMemo(() => filtrarVoos(voos, filtro.aplicado), [voos, filtro.aplicado]);
   return (
     <div className="space-y-6">
       <div className={`${C.painel} space-y-4 p-5`}>
@@ -734,8 +903,9 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
           <Filter size={14} /> Filtros operacionais — Posto CAN BR
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <CamposFiltro f={f} setF={setF} aeronaves={aeronaves} />
+          <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} />
         </div>
+        <BotoesFiltro filtro={filtro} />
       </div>
       <div className={`${C.painel} flex items-center justify-between px-5 py-4`}>
         <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
@@ -922,100 +1092,172 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
   );
 }
 
-function TelaDesembarque({ voos, aeronaves, onSalvar, avisar }) {
-  const [f, setF] = useState(FILTRO_VAZIO);
-  const [sel, setSel] = useState({});
-  const [qtds, setQtds] = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const lista = useMemo(() => filtrarVoos(voos, f), [voos, f]);
-  const valor = (v) => qtds[v.id] ?? String(v.desembarcados ?? 0);
+const NOVO_DESEMB = () => ({ aeronave: '', matricula: '', rota: '', data_voo: hoje(), desembarcados: '' });
 
-  const todos = () => {
-    const tudo = lista.length > 0 && lista.every((v) => sel[v.id]);
-    const n = { ...sel };
-    lista.forEach((v) => (n[v.id] = !tudo));
-    setSel(n);
+function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }) {
+  const filtro = useFiltro();
+  const [f, setF] = useState(NOVO_DESEMB);
+  const [editando, setEditando] = useState(null);
+  const [salvando, setSalvando] = useState(false);
+  const formRef = useRef(null);
+
+  const lista = useMemo(() => filtrarVoos(desembarques, filtro.aplicado), [desembarques, filtro.aplicado]);
+  const total = somar(lista, 'desembarcados');
+  const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+
+  const editar = (d) => {
+    setEditando(d);
+    setF({
+      aeronave: d.aeronave,
+      matricula: d.matricula || '',
+      rota: d.rota || '',
+      data_voo: d.data_voo,
+      desembarcados: String(d.desembarcados ?? '')
+    });
+    if (formRef.current) formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const cancelar = () => {
+    setEditando(null);
+    setF(NOVO_DESEMB());
   };
 
-  const guardar = async () => {
-    const escolhidos = lista.filter((v) => sel[v.id]);
-    if (!escolhidos.length) return avisar('Selecione ao menos um voo.', 'erro');
-    const mapa = {};
-    for (const v of escolhidos) {
-      const q = Number(valor(v)) || 0;
-      if (q < 0 || (v.pax > 0 && q > v.pax)) {
-        return avisar(`Desembarque inválido em ${v.aeronave} (${fmtData(v.data_voo)}): máximo ${v.pax}.`, 'erro');
-      }
-      mapa[v.id] = q;
+  const enviar = async (e) => {
+    e.preventDefault();
+    const aeronave = f.aeronave || aeronaves[0]?.modelo;
+    if (!aeronave) return avisar('Cadastre uma aeronave antes de incluir voos.', 'erro');
+    const qtd = Number(f.desembarcados);
+    if (f.desembarcados === '' || !Number.isFinite(qtd) || qtd < 0) {
+      return avisar('Informe a quantidade de desembarcados.', 'erro');
     }
     setSalvando(true);
-    const ok = await onSalvar(mapa);
+    const ok = await onSalvar(
+      {
+        aeronave,
+        matricula: f.matricula.trim().toUpperCase(),
+        rota: f.rota.trim().toUpperCase(),
+        data_voo: f.data_voo,
+        desembarcados: Math.floor(qtd)
+      },
+      editando?.id
+    );
     setSalvando(false);
-    if (ok) {
-      setSel({});
-      setQtds({});
-    }
+    if (ok) cancelar();
   };
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className={`${C.painel} space-y-4 p-5`}>
-        <div className={C.titulo}>
-          <UserCheck size={15} /> Gestão e filtro de desembarque — múltiplos voos
+      <form ref={formRef} onSubmit={enviar} className={`${C.painel} space-y-4 p-5`}>
+        <div className="flex items-center justify-between">
+          <div className={C.titulo}>
+            <UserCheck size={15} /> {editando ? 'Editar voo de desembarque' : 'Incluir voo de desembarque'}
+          </div>
+          {editando && (
+            <button type="button" onClick={cancelar} className="text-[11px] font-bold uppercase text-rose-400 underline">
+              Cancelar edição
+            </button>
+          )}
         </div>
         <p className="text-[11px] text-slate-400">
-          Filtre por aeronave, data inicial, data final, data específica ou mês/ano, selecione múltiplos voos e indique o
-          total de passageiros desembarcados.
+          Registe o voo e informe quantos passageiros desembarcaram nele. Este registo é independente dos voos adicionados
+          no Painel de Voos.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <CamposFiltro f={f} setF={setF} aeronaves={aeronaves} />
+          <Campo rotulo="Tipo de aeronave FAB">
+            <select className={C.input} value={f.aeronave || aeronaves[0]?.modelo || ''} onChange={set('aeronave')}>
+              {aeronaves.map((a) => (
+                <option key={a.id} value={a.modelo}>{a.modelo}</option>
+              ))}
+            </select>
+          </Campo>
+          <Campo rotulo="Data do voo">
+            <input type="date" required className={C.input} value={f.data_voo} onChange={set('data_voo')} />
+          </Campo>
+          <Campo rotulo="Matrícula (opcional)">
+            <input className={C.input} value={f.matricula} onChange={set('matricula')} placeholder="EX: FAB 2310" />
+          </Campo>
+          <Campo rotulo="Rota / origem (opcional)">
+            <input className={C.input} value={f.rota} onChange={set('rota')} placeholder="SBGR-SBBR" />
+          </Campo>
+          <Campo rotulo="Qtd desembarcados">
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              required
+              className={C.input}
+              value={f.desembarcados}
+              onChange={set('desembarcados')}
+              placeholder="0"
+            />
+          </Campo>
+        </div>
+        <button type="submit" disabled={salvando} className={`${C.botao} w-full py-4`}>
+          {salvando ? 'A guardar…' : editando ? 'Salvar alterações do desembarque' : 'Incluir voo de desembarque'}
+        </button>
+      </form>
+
+      <div className={`${C.painel} space-y-4 p-5`}>
+        <div className={C.titulo}>
+          <Filter size={14} /> Filtros de desembarque
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} />
+        </div>
+        <BotoesFiltro filtro={filtro} />
+      </div>
+
+      <div className={`${C.painel} flex flex-wrap items-center justify-between gap-3 px-5 py-4`}>
+        <h3 className="text-xs font-bold uppercase text-white">Voos de desembarque registados</h3>
+        <div className="flex items-center gap-4 font-mono text-[11px] uppercase text-slate-400">
+          <span>{lista.length} voos</span>
+          <span className="text-sky-300">
+            Total desembarcados: <b className="text-white">{total}</b>
+          </span>
         </div>
       </div>
 
-      <div className={`${C.painel} space-y-5 p-5`}>
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <span className="text-xs font-bold uppercase text-sky-400">Voos encontrados para desembarque ({lista.length})</span>
-          <button onClick={todos} className="text-[11px] font-bold uppercase text-white underline">Selecionar todos</button>
-        </div>
-        {lista.length === 0 && <p className="py-6 text-center text-xs uppercase text-slate-500">Nenhum voo encontrado.</p>}
+      {lista.length === 0 ? (
+        <p className="py-10 text-center text-xs uppercase text-slate-500">Nenhum desembarque encontrado.</p>
+      ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {lista.map((v) => (
-            <div key={v.id} className={`${C.caixa} space-y-3 p-4`}>
-              <div className="flex items-start gap-3">
-                <input type="checkbox" className="mt-1 h-4 w-4" checked={!!sel[v.id]} onChange={() => setSel((s) => ({ ...s, [v.id]: !s[v.id] }))} />
-                <div className="flex-1">
-                  <div className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</div>
-                  <div className="text-[11px] uppercase text-slate-400">
-                    Data: <b className="font-mono text-white">{v.data_voo}</b> · Pax: <b className="font-mono text-white">{v.pax}</b>
-                  </div>
+          {lista.map((d) => (
+            <div key={d.id} className={`${C.painel} space-y-3 p-5`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold uppercase text-sky-400">{d.aeronave}</h3>
+                  <p className="mt-1 text-[11px] uppercase text-slate-400">
+                    Matrícula: <b className="font-mono text-white">{d.matricula || 'N/D'}</b>
+                  </p>
                 </div>
-                <span className="rounded-md border border-sky-900 bg-sky-950/40 px-2 py-1 text-[10px] font-bold uppercase text-sky-300">
-                  {diaSemana(v.data_voo)}
-                </span>
+                <div className="text-right">
+                  <span className="inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">
+                    {d.rota || '—'}
+                  </span>
+                  <p className="mt-1 font-mono text-[10px] text-slate-500">{d.data_voo}</p>
+                </div>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-[#0c1424] px-3 py-2">
-                <span className="flex items-center gap-2 text-[11px] font-bold uppercase text-sky-400">
-                  <UserCheck size={13} /> Qtd desembarcados:
+              <div className="grid grid-cols-2 gap-2">
+                <Caixa rotulo="Desembarcados" valor={d.desembarcados} destaque />
+                <Caixa rotulo="Dia" valor={diaSemana(d.data_voo)} />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
+                <span className="rounded-lg border border-slate-800 bg-[#050a16] px-2.5 py-1.5 text-[10px] uppercase text-slate-400">
+                  Última alt. por: <b className="font-mono text-white">{d.ultima_alt_por || '—'}</b>{' '}
+                  <span className="font-mono text-sky-300">({fmtTs(d.ultima_alt_em)})</span>
                 </span>
-                <input
-                  type="number"
-                  min="0"
-                  inputMode="numeric"
-                  className="w-24 rounded-lg border border-slate-700 bg-[#050a16] px-2 py-2 text-center font-mono text-xs text-white focus:border-sky-500 focus:outline-none"
-                  value={valor(v)}
-                  onChange={(e) => {
-                    setQtds((q) => ({ ...q, [v.id]: e.target.value }));
-                    setSel((s) => ({ ...s, [v.id]: true }));
-                  }}
-                />
+                <div className="flex items-center gap-4 text-[11px] font-bold uppercase">
+                  <button onClick={() => editar(d)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
+                    <Pencil size={13} /> Editar
+                  </button>
+                  <button onClick={() => onApagar(d)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
+                    <Trash2 size={13} /> Apagar
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
-        <button onClick={guardar} disabled={salvando} className={`${C.botao} w-full py-4`}>
-          {salvando ? 'A guardar…' : 'Guardar desembarque para os voos selecionados'}
-        </button>
-      </div>
+      )}
     </div>
   );
 }
@@ -1057,9 +1299,10 @@ function TelaAeronaves({ aeronaves, onAdicionar, onRemover }) {
   );
 }
 
-function TelaRelatorio({ voos, aeronaves }) {
-  const [f, setF] = useState(FILTRO_VAZIO);
-  const lista = useMemo(() => filtrarVoos(voos, f), [voos, f]);
+function TelaRelatorio({ voos, desembarques, aeronaves }) {
+  const filtro = useFiltro();
+  const lista = useMemo(() => filtrarVoos(voos, filtro.aplicado), [voos, filtro.aplicado]);
+  const listaDesemb = useMemo(() => filtrarVoos(desembarques, filtro.aplicado), [desembarques, filtro.aplicado]);
 
   const relatorio = (
     <div className="rounded-2xl bg-white p-8 text-slate-900 print:rounded-none print:p-0">
@@ -1071,14 +1314,15 @@ function TelaRelatorio({ voos, aeronaves }) {
         </div>
         <div className="text-right font-mono text-[11px] uppercase text-slate-500">
           <div>Emitido em: {fmtData(hoje())}</div>
-          <div>Total de registos: {lista.length}</div>
+          <div>Voos: {lista.length}</div>
+          <div>Voos de desembarque: {listaDesemb.length}</div>
         </div>
       </div>
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-xs">
           <thead>
             <tr className="bg-[#0c1424] text-[10px] uppercase text-white">
-              {['Data / Dia', 'Aeronave / Matr.', 'Rota', 'Pax', 'Desembarcados', 'Peso total', 'Efetividade'].map((h) => (
+              {['Data / Dia', 'Aeronave / Matr.', 'Rota', 'Pax', 'Peso total', 'Efetividade'].map((h) => (
                 <th key={h} className="px-3 py-3">{h}</th>
               ))}
             </tr>
@@ -1095,7 +1339,6 @@ function TelaRelatorio({ voos, aeronaves }) {
                 </td>
                 <td className="px-3 py-3 font-mono">{v.rota}</td>
                 <td className="px-3 py-3 font-mono font-bold">{v.pax}</td>
-                <td className="px-3 py-3 font-mono">{v.desembarcados}</td>
                 <td className="px-3 py-3 font-mono font-bold">{v.total_peso} KG</td>
                 <td className="px-3 py-3 font-mono font-bold text-emerald-700">
                   {fmtEf(calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real))}
@@ -1106,7 +1349,6 @@ function TelaRelatorio({ voos, aeronaves }) {
               <tr className="bg-slate-100 font-bold">
                 <td className="px-3 py-3 uppercase" colSpan="3">Total</td>
                 <td className="px-3 py-3 font-mono">{somar(lista, 'pax')}</td>
-                <td className="px-3 py-3 font-mono">{somar(lista, 'desembarcados')}</td>
                 <td className="px-3 py-3 font-mono">{somar(lista, 'total_peso')} KG</td>
                 <td />
               </tr>
@@ -1114,6 +1356,41 @@ function TelaRelatorio({ voos, aeronaves }) {
           </tbody>
         </table>
       </div>
+
+      {listaDesemb.length > 0 && (
+        <div className="mt-8 overflow-x-auto">
+          <h3 className="mb-2 text-xs font-extrabold uppercase">Desembarques registados</h3>
+          <table className="w-full min-w-[480px] text-left text-xs">
+            <thead>
+              <tr className="bg-[#0c1424] text-[10px] uppercase text-white">
+                {['Data / Dia', 'Aeronave / Matr.', 'Rota', 'Desembarcados'].map((h) => (
+                  <th key={h} className="px-3 py-3">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {listaDesemb.map((d) => (
+                <tr key={d.id} className="border-b border-slate-200">
+                  <td className="px-3 py-3 font-mono">
+                    {d.data_voo}
+                    <div className="text-[9px] uppercase text-slate-500">{diaSemana(d.data_voo)}</div>
+                  </td>
+                  <td className="px-3 py-3 font-bold uppercase">
+                    {d.aeronave}{d.matricula ? ` (${d.matricula})` : ''}
+                  </td>
+                  <td className="px-3 py-3 font-mono">{d.rota}</td>
+                  <td className="px-3 py-3 font-mono font-bold">{d.desembarcados}</td>
+                </tr>
+              ))}
+              <tr className="bg-slate-100 font-bold">
+                <td className="px-3 py-3 uppercase" colSpan="3">Total desembarcados</td>
+                <td className="px-3 py-3 font-mono">{somar(listaDesemb, 'desembarcados')}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="mt-16 flex items-end justify-between border-t border-slate-300 pt-4 text-[11px] uppercase">
         <div>
           <div className="mb-1 w-64 border-b border-slate-900" />
@@ -1137,13 +1414,14 @@ function TelaRelatorio({ voos, aeronaves }) {
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <CamposFiltro
-            f={f}
-            setF={setF}
+            f={filtro.rascunho}
+            setF={filtro.setRascunho}
             aeronaves={aeronaves}
             comMes={false}
             rotulos={{ inicial: 'Data inicial (período)', final: 'Data final (período)', data: 'Data específica (dia comum)' }}
           />
         </div>
+        <BotoesFiltro filtro={filtro} />
       </div>
       {relatorio}
       {createPortal(<div className="print-only">{relatorio}</div>, document.body)}
@@ -1252,8 +1530,8 @@ function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <Caixa rotulo="Pax" valor={v.pax} />
+                <Caixa rotulo="Bagagem" valor={`${v.peso_bagagem} KG`} />
                 <Caixa rotulo="Total" valor={`${v.total_peso} KG`} destaque />
-                <Caixa rotulo="Desemb." valor={v.desembarcados} />
               </div>
               <div className="rounded-lg border border-rose-900/60 bg-rose-950/20 px-3 py-2 text-[11px] uppercase text-rose-300">
                 Excluído por <b className="font-mono text-white">{v.excluido_por || '—'}</b>{' '}
@@ -1294,6 +1572,7 @@ export default function App() {
   const [aba, setAba] = useState('dashboard');
   const [menuAberto, setMenuAberto] = useState(() => window.innerWidth >= 1024);
   const [voos, setVoos] = useState([]);
+  const [desembarques, setDesembarques] = useState([]);
   const [aeronaves, setAeronaves] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -1314,16 +1593,18 @@ export default function App() {
   const carregarTudo = useCallback(async () => {
     if (!supabase) return;
     try {
-      const [v, a, u] = await Promise.all([
+      const [v, d, a, u] = await Promise.all([
         supabase.from('voos').select('*').order('data_voo', { ascending: false }).order('criado_em', { ascending: false }),
+        supabase.from('desembarques').select('*').order('data_voo', { ascending: false }).order('criado_em', { ascending: false }),
         supabase.from('aeronaves').select('*').order('modelo'),
         supabase.from('usuarios').select('id,nome,perfil,criado_em').order('nome')
       ]);
-      if (v.error || a.error || u.error) {
+      if (v.error || d.error || a.error || u.error) {
         setOnline(false);
         return;
       }
       setVoos(v.data);
+      setDesembarques(d.data);
       setAeronaves(a.data);
       setUsuarios(u.data);
       setOnline(true);
@@ -1339,6 +1620,7 @@ export default function App() {
     const canal = supabase
       .channel('flightops-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'voos' }, carregarTudo)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'desembarques' }, carregarTudo)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'aeronaves' }, carregarTudo)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, carregarTudo)
       .subscribe();
@@ -1448,21 +1730,21 @@ export default function App() {
       aoConfirmar: () => gravar(supabase.from('voos').delete().eq('id', v.id), 'Voo excluído definitivamente.')
     });
 
-  const salvarDesembarque = async (mapa) => {
-    const res = await Promise.all(
-      Object.entries(mapa).map(([id, qtd]) =>
-        supabase.from('voos').update({ desembarcados: qtd, ...carimbo() }).eq('id', id)
-      )
+  const salvarDesemb = (dados, id) => {
+    const payload = { ...dados, ...carimbo() };
+    return gravar(
+      id ? supabase.from('desembarques').update(payload).eq('id', id) : supabase.from('desembarques').insert(payload),
+      id ? 'Desembarque atualizado.' : 'Voo de desembarque incluído.'
     );
-    const falha = res.find((r) => r.error);
-    if (falha) {
-      avisar(`Erro: ${falha.error.message}`, 'erro');
-      return false;
-    }
-    avisar('Desembarque guardado.');
-    await carregarTudo();
-    return true;
   };
+
+  const pedirExclusaoDesemb = (d) =>
+    setConfirmacao({
+      titulo: 'Excluir desembarque?',
+      texto: `Excluir o registo de ${d.desembarcados} desembarcados do voo ${d.aeronave} de ${fmtData(d.data_voo)}? Esta ação não pode ser desfeita.`,
+      botao: 'Sim, excluir',
+      aoConfirmar: () => gravar(supabase.from('desembarques').delete().eq('id', d.id), 'Registo excluído.')
+    });
 
   const adicionarAeronave = (modelo) => gravar(supabase.from('aeronaves').insert({ modelo }), 'Aeronave adicionada.');
   const pedirRemoverAeronave = (a) =>
@@ -1517,140 +1799,152 @@ export default function App() {
   const abaAtual = MENU.find((m) => m.id === aba && (!m.admin || ehAdmin)) ? aba : 'dashboard';
 
   return (
-    <div id="app-shell" className="flex h-screen flex-col bg-[#050a16] font-sans text-slate-200">
-      <style>{`
-        .print-only{display:none}
-        @media print{
-          @page{margin:12mm}
-          #root{display:none!important}
-          body{background:#fff!important}
-          .print-only{display:block!important;color:#000}
-          .print-only *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        }
-      `}</style>
+    <>
+      <FundoAeronaves />
+      <div id="app-shell" className="relative z-10 flex h-screen flex-col font-sans text-slate-200">
+        <style>{`
+          .print-only{display:none}
+          @media print{
+            @page{margin:12mm}
+            #root{display:none!important}
+            body{background:#fff!important}
+            .print-only{display:block!important;color:#000}
+            .print-only *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+          }
+        `}</style>
 
-      {/* CABEÇALHO */}
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-[#0a1120] px-4 py-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setMenuAberto((m) => !m)}
-            className="rounded-xl border border-slate-700 p-2 text-slate-200 hover:bg-slate-800"
-            aria-label="Menu"
-          >
-            <Menu size={18} />
-          </button>
-          <div className="rounded-xl bg-sky-600 p-2 text-white shadow-lg shadow-sky-600/30">
-            <Plane size={20} />
+        {/* CABEÇALHO */}
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-[#0a1120] px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMenuAberto((m) => !m)}
+              className="rounded-xl border border-slate-700 p-2 text-slate-200 hover:bg-slate-800"
+              aria-label="Menu"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="rounded-xl bg-sky-600 p-2 text-white shadow-lg shadow-sky-600/30">
+              <Plane size={20} />
+            </div>
+            <div>
+              <h1 className="text-base font-extrabold uppercase leading-tight tracking-wide text-white">
+                FlightOps <span className="text-sky-400">BSB</span>
+              </h1>
+              <p className="hidden text-[10px] uppercase text-slate-400 sm:block">Posto CAN BR — Base Aérea de Brasília (SBBR)</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base font-extrabold uppercase leading-tight tracking-wide text-white">
-              FlightOps <span className="text-sky-400">BSB</span>
-            </h1>
-            <p className="hidden text-[10px] uppercase text-slate-400 sm:block">Posto CAN BR — Base Aérea de Brasília (SBBR)</p>
+          <div className="flex items-center gap-2">
+            <span
+              className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase sm:flex ${
+                online ? 'border-emerald-900 bg-emerald-950/40 text-emerald-400' : 'border-amber-800 bg-amber-950/40 text-amber-400'
+              }`}
+            >
+              <span className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'animate-pulse bg-amber-400'}`} />
+              {online ? 'Posto CAN BR operacional' : 'Sem ligação — a tentar…'}
+            </span>
+            <button
+              onClick={sair}
+              className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-sky-300 hover:bg-slate-800"
+              title="Sair"
+            >
+              {usuario.nome} ({usuario.perfil === 'admin' ? 'Admin' : 'Operador'}) <LogOut size={14} className="text-rose-400" />
+            </button>
           </div>
+        </header>
+
+        <div className="relative flex min-h-0 flex-1">
+          {menuAberto && <div className="absolute inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setMenuAberto(false)} />}
+
+          {/* MENU LATERAL */}
+          {menuAberto && (
+            <aside className="absolute left-0 top-0 z-30 flex h-full w-60 shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0a1120] p-3 lg:static">
+              <nav className="space-y-1">
+                {MENU.filter((m) => !m.admin || ehAdmin).map(({ id, rotulo, Icone }) => (
+                  <button
+                    key={id}
+                    onClick={() => ir(id)}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${
+                      abaAtual === id ? 'bg-sky-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icone size={16} />
+                    <span className="flex-1">{rotulo}</span>
+                    {id === 'lixeira' && lixeira.length > 0 && (
+                      <span className="rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white">{lixeira.length}</span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+              <button
+                onClick={() => setMenuAberto(false)}
+                className="flex items-center justify-center gap-2 rounded-lg bg-slate-800/70 py-2.5 text-xs text-slate-300 hover:bg-slate-800"
+              >
+                <ChevronLeft size={14} /> Ocultar Menu
+              </button>
+            </aside>
+          )}
+
+          {/* CONTEÚDO */}
+          <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">
+            {carregando ? (
+              <p className="py-20 text-center text-xs uppercase text-slate-500">A carregar dados…</p>
+            ) : (
+              <>
+                {abaAtual === 'dashboard' && <TelaDashboard voos={ativos} desembarques={desembarques} aeronaves={aeronaves} />}
+                {abaAtual === 'voos' && <TelaPainel voos={ativos} aeronaves={aeronaves} onEditar={editar} onApagar={pedirExclusao} />}
+                {abaAtual === 'adicionar' && (
+                  <FormVoo
+                    key={vooEditando?.id || 'novo'}
+                    aeronaves={aeronaves}
+                    voo={vooEditando}
+                    onSalvar={salvarVoo}
+                    onCancelar={() => {
+                      setVooEditando(null);
+                      setAba('voos');
+                    }}
+                    avisar={avisar}
+                  />
+                )}
+                {abaAtual === 'desembarque' && (
+                  <TelaDesembarque
+                    desembarques={desembarques}
+                    aeronaves={aeronaves}
+                    onSalvar={salvarDesemb}
+                    onApagar={pedirExclusaoDesemb}
+                    avisar={avisar}
+                  />
+                )}
+                {abaAtual === 'aeronaves' && <TelaAeronaves aeronaves={aeronaves} onAdicionar={adicionarAeronave} onRemover={pedirRemoverAeronave} />}
+                {abaAtual === 'relatorio' && <TelaRelatorio voos={ativos} desembarques={desembarques} aeronaves={aeronaves} />}
+                {abaAtual === 'usuarios' && (
+                  <TelaUsuarios usuario={usuario} usuarios={usuarios} onSenha={trocarSenha} onCriar={criarUsuario} onRemover={pedirRemoverUsuario} />
+                )}
+                {abaAtual === 'lixeira' && <TelaLixeira voos={lixeira} onRestaurar={restaurarVoo} onExcluirDef={pedirExclusaoDefinitiva} />}
+              </>
+            )}
+          </main>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`hidden items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase sm:flex ${
-              online ? 'border-emerald-900 bg-emerald-950/40 text-emerald-400' : 'border-amber-800 bg-amber-950/40 text-amber-400'
+
+        <Modal
+          dados={confirmacao}
+          onCancelar={() => setConfirmacao(null)}
+          onConfirmar={async () => {
+            await confirmacao.aoConfirmar();
+            setConfirmacao(null);
+          }}
+        />
+
+        {aviso && (
+          <div
+            className={`fixed bottom-4 right-4 z-50 max-w-xs rounded-xl border px-4 py-3 text-xs font-bold shadow-xl ${
+              aviso.tipo === 'erro' ? 'border-rose-800 bg-rose-950 text-rose-200' : 'border-emerald-800 bg-emerald-950 text-emerald-200'
             }`}
           >
-            <span className={`h-2 w-2 rounded-full ${online ? 'bg-emerald-400' : 'animate-pulse bg-amber-400'}`} />
-            {online ? 'Posto CAN BR operacional' : 'Sem ligação — a tentar…'}
-          </span>
-          <button
-            onClick={sair}
-            className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-sky-300 hover:bg-slate-800"
-            title="Sair"
-          >
-            {usuario.nome} ({usuario.perfil === 'admin' ? 'Admin' : 'Operador'}) <LogOut size={14} className="text-rose-400" />
-          </button>
-        </div>
-      </header>
-
-      <div className="relative flex min-h-0 flex-1">
-        {menuAberto && <div className="absolute inset-0 z-20 bg-black/60 lg:hidden" onClick={() => setMenuAberto(false)} />}
-
-        {/* MENU LATERAL */}
-        {menuAberto && (
-          <aside className="absolute left-0 top-0 z-30 flex h-full w-60 shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0a1120] p-3 lg:static">
-            <nav className="space-y-1">
-              {MENU.filter((m) => !m.admin || ehAdmin).map(({ id, rotulo, Icone }) => (
-                <button
-                  key={id}
-                  onClick={() => ir(id)}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${
-                    abaAtual === id ? 'bg-sky-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icone size={16} />
-                  <span className="flex-1">{rotulo}</span>
-                  {id === 'lixeira' && lixeira.length > 0 && (
-                    <span className="rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white">{lixeira.length}</span>
-                  )}
-                </button>
-              ))}
-            </nav>
-            <button
-              onClick={() => setMenuAberto(false)}
-              className="flex items-center justify-center gap-2 rounded-lg bg-slate-800/70 py-2.5 text-xs text-slate-300 hover:bg-slate-800"
-            >
-              <ChevronLeft size={14} /> Ocultar Menu
-            </button>
-          </aside>
+            {aviso.texto}
+          </div>
         )}
-
-        {/* CONTEÚDO */}
-        <main className="min-w-0 flex-1 overflow-y-auto p-4 lg:p-8">
-          {carregando ? (
-            <p className="py-20 text-center text-xs uppercase text-slate-500">A carregar dados…</p>
-          ) : (
-            <>
-              {abaAtual === 'dashboard' && <TelaDashboard voos={ativos} aeronaves={aeronaves} />}
-              {abaAtual === 'voos' && <TelaPainel voos={ativos} aeronaves={aeronaves} onEditar={editar} onApagar={pedirExclusao} />}
-              {abaAtual === 'adicionar' && (
-                <FormVoo
-                  key={vooEditando?.id || 'novo'}
-                  aeronaves={aeronaves}
-                  voo={vooEditando}
-                  onSalvar={salvarVoo}
-                  onCancelar={() => {
-                    setVooEditando(null);
-                    setAba('voos');
-                  }}
-                  avisar={avisar}
-                />
-              )}
-              {abaAtual === 'desembarque' && <TelaDesembarque voos={ativos} aeronaves={aeronaves} onSalvar={salvarDesembarque} avisar={avisar} />}
-              {abaAtual === 'aeronaves' && <TelaAeronaves aeronaves={aeronaves} onAdicionar={adicionarAeronave} onRemover={pedirRemoverAeronave} />}
-              {abaAtual === 'relatorio' && <TelaRelatorio voos={ativos} aeronaves={aeronaves} />}
-              {abaAtual === 'usuarios' && (
-                <TelaUsuarios usuario={usuario} usuarios={usuarios} onSenha={trocarSenha} onCriar={criarUsuario} onRemover={pedirRemoverUsuario} />
-              )}
-              {abaAtual === 'lixeira' && <TelaLixeira voos={lixeira} onRestaurar={restaurarVoo} onExcluirDef={pedirExclusaoDefinitiva} />}
-            </>
-          )}
-        </main>
       </div>
-
-      <Modal
-        dados={confirmacao}
-        onCancelar={() => setConfirmacao(null)}
-        onConfirmar={async () => {
-          await confirmacao.aoConfirmar();
-          setConfirmacao(null);
-        }}
-      />
-
-      {aviso && (
-        <div
-          className={`fixed bottom-4 right-4 z-50 max-w-xs rounded-xl border px-4 py-3 text-xs font-bold shadow-xl ${
-            aviso.tipo === 'erro' ? 'border-rose-800 bg-rose-950 text-rose-200' : 'border-emerald-800 bg-emerald-950 text-emerald-200'
-          }`}
-        >
-          {aviso.texto}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
+

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BarChart3, Database, PlusCircle, UserCheck, Plane, Printer, Users, ChevronLeft,
   Menu, LogOut, Filter, PieChart, Pencil, Trash2, CalendarDays, Zap,
-  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle, Eye, EyeOff
+  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle, Eye, EyeOff, ChevronDown, Check
 } from 'lucide-react';
 import { supabase, supabaseConfigurado } from './supabase.js';
 
@@ -142,13 +142,14 @@ const cruzar = (txtPrevisto, txtReal) => {
 
 /* ---------------------------------------------------------------
    FILTROS (valem para voos e para desembarques)
+   aeronave agora é uma LISTA (várias aeronaves ao mesmo tempo)
    --------------------------------------------------------------- */
-const FILTRO_VAZIO = { aeronave: '', inicial: '', final: '', data: '', mes: '', local: '' };
+const FILTRO_VAZIO = { aeronave: [], inicial: '', final: '', data: '', mes: '', local: '' };
 const codigosRota = (rota) => (rota || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 
 const filtrarVoos = (lista, f) =>
   lista.filter((v) => {
-    if (f.aeronave && v.aeronave !== f.aeronave) return false;
+    if (f.aeronave.length > 0 && !f.aeronave.includes(v.aeronave)) return false;
     if (f.inicial && v.data_voo < f.inicial) return false;
     if (f.final && v.data_voo > f.final) return false;
     if (f.data && v.data_voo !== f.data) return false;
@@ -158,6 +159,18 @@ const filtrarVoos = (lista, f) =>
   });
 
 const somar = (lista, campo) => lista.reduce((s, v) => s + (Number(v[campo]) || 0), 0);
+
+// Rota: coloca o traço sozinho depois de cada código de 4 letras (SBBRSBGL → SBBR-SBGL)
+const formatarRota = (novo, anterior = '') => {
+  const limpo = novo.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let r = (limpo.match(/.{1,4}/g) || []).join('-');
+  const apagando = novo.length < anterior.length;
+  if (!apagando && limpo.length > 0 && limpo.length % 4 === 0) r += '-';
+  return r;
+};
+// Remove o traço que sobra no final ao sair do campo ou salvar
+const limparRota = (rota) =>
+  (rota || '').toUpperCase().replace(/[^A-Z0-9]/g, '').match(/.{1,4}/g)?.join('-') || '';
 
 // Os filtros só passam a valer quando o botão "Gerar filtros" é clicado
 function useFiltro() {
@@ -327,17 +340,96 @@ function Campo({ rotulo, children, className = '' }) {
   );
 }
 
+function SeletorAeronaves({ valor, aeronaves, onChange }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!aberto) return undefined;
+    const fora = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setAberto(false);
+    };
+    document.addEventListener('mousedown', fora);
+    document.addEventListener('touchstart', fora);
+    return () => {
+      document.removeEventListener('mousedown', fora);
+      document.removeEventListener('touchstart', fora);
+    };
+  }, [aberto]);
+
+  const alternar = (modelo) =>
+    onChange(valor.includes(modelo) ? valor.filter((m) => m !== modelo) : [...valor, modelo]);
+
+  const resumo =
+    valor.length === 0 ? 'TODAS AS AERONAVES' : valor.length === 1 ? valor[0] : `${valor.length} AERONAVES SELECIONADAS`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setAberto((a) => !a)}
+        className={`${C.input} flex items-center justify-between gap-2 text-left`}
+      >
+        <span className="truncate">{resumo}</span>
+        <ChevronDown size={14} className={`shrink-0 text-slate-400 transition ${aberto ? 'rotate-180' : ''}`} />
+      </button>
+      {aberto && (
+        <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[240px] rounded-xl border border-slate-700 bg-[#050a16] p-2 shadow-2xl">
+          <div className="mb-1 flex items-center justify-between px-1 pb-1 text-[10px] font-bold uppercase">
+            <button type="button" onClick={() => onChange(aeronaves.map((a) => a.modelo))} className="text-sky-400 hover:underline">
+              Marcar todas
+            </button>
+            <button type="button" onClick={() => onChange([])} className="text-rose-400 hover:underline">
+              Limpar
+            </button>
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {aeronaves.map((a) => {
+              const marcado = valor.includes(a.modelo);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => alternar(a.modelo)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left font-mono text-[11px] uppercase hover:bg-slate-800 ${
+                    marcado ? 'text-sky-300' : 'text-slate-300'
+                  }`}
+                >
+                  <span
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                      marcado ? 'border-sky-500 bg-sky-600' : 'border-slate-600'
+                    }`}
+                  >
+                    {marcado && <Check size={11} className="text-white" />}
+                  </span>
+                  {a.modelo}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setAberto(false)}
+            className="mt-2 w-full rounded-lg bg-sky-600 py-2 text-[11px] font-bold uppercase text-white hover:bg-sky-500"
+          >
+            Pronto
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CamposFiltro({ f, setF, aeronaves, comMes = true, rotulos = {} }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return (
     <>
-      <Campo rotulo="Aeronave FAB">
-        <select className={C.input} value={f.aeronave} onChange={set('aeronave')}>
-          <option value="">TODAS AS AERONAVES</option>
-          {aeronaves.map((a) => (
-            <option key={a.id} value={a.modelo}>{a.modelo}</option>
-          ))}
-        </select>
+      <Campo rotulo="Aeronave(s) FAB">
+        <SeletorAeronaves
+          valor={f.aeronave}
+          aeronaves={aeronaves}
+          onChange={(lista) => setF({ ...f, aeronave: lista })}
+        />
       </Campo>
       <Campo rotulo={rotulos.inicial || 'Data inicial'}>
         <input type="date" className={C.input} value={f.inicial} onChange={set('inicial')} />
@@ -658,6 +750,14 @@ function Modal({ dados, onCancelar, onConfirmar }) {
 /* ================================================================
    TELAS
    ================================================================ */
+function Rodape({ className = '' }) {
+  return (
+    <div className={`text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 ${className}`}>
+      Criado por <span className="text-sky-400">CAIO</span> · FlightOps BSB
+    </div>
+  );
+}
+
 function TelaConfig() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050a16] p-6 text-slate-200">
@@ -737,6 +837,7 @@ function TelaLogin({ onEntrar, online }) {
           </button>
         </form>
       </div>
+      <Rodape className="fixed inset-x-0 bottom-3 z-10" />
     </>
   );
 }
@@ -981,7 +1082,7 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
       {
         aeronave,
         matricula: f.matricula.trim().toUpperCase(),
-        rota: f.rota.trim().toUpperCase(),
+        rota: limparRota(f.rota),
         data_voo: f.data_voo,
         hora_chamada: normHora(f.hora_chamada),
         hora_decolagem: normHora(f.hora_decolagem),
@@ -1027,8 +1128,16 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
         <Campo rotulo="Matrícula (não obrigatória)">
           <input className={C.input} value={f.matricula} onChange={set('matricula')} placeholder="EX: FAB 2310" />
         </Campo>
-        <Campo rotulo="Rota (ex: SBBR-SBGR-SBGL)">
-          <input className={C.input} value={f.rota} onChange={set('rota')} placeholder="SBBR-SBGR-SBGL" />
+        <Campo rotulo="Rota (digite só os códigos: SBBRSBGL)">
+          <input
+            className={C.input}
+            value={f.rota}
+            onChange={(e) => setF((s) => ({ ...s, rota: formatarRota(e.target.value, s.rota) }))}
+            onBlur={() => setF((s) => ({ ...s, rota: limparRota(s.rota) }))}
+            placeholder="SBBR-SBGL"
+            autoCapitalize="characters"
+            autoComplete="off"
+          />
         </Campo>
 
         <Campo rotulo="Data do voo">
@@ -1138,7 +1247,7 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
       {
         aeronave,
         matricula: f.matricula.trim().toUpperCase(),
-        rota: f.rota.trim().toUpperCase(),
+        rota: limparRota(f.rota),
         data_voo: f.data_voo,
         desembarcados: Math.floor(qtd)
       },
@@ -1180,7 +1289,15 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
             <input className={C.input} value={f.matricula} onChange={set('matricula')} placeholder="EX: FAB 2310" />
           </Campo>
           <Campo rotulo="Rota / origem (opcional)">
-            <input className={C.input} value={f.rota} onChange={set('rota')} placeholder="SBGR-SBBR" />
+            <input
+              className={C.input}
+              value={f.rota}
+              onChange={(e) => setF((s) => ({ ...s, rota: formatarRota(e.target.value, s.rota) }))}
+              onBlur={() => setF((s) => ({ ...s, rota: limparRota(s.rota) }))}
+              placeholder="SBGR-SBBR"
+              autoCapitalize="characters"
+              autoComplete="off"
+            />
           </Campo>
           <Campo rotulo="Qtd desembarcados">
             <input
@@ -1928,6 +2045,10 @@ export default function App() {
             )}
           </main>
         </div>
+
+        <footer className="shrink-0 border-t border-slate-800 bg-[#0a1120] py-2">
+          <Rodape />
+        </footer>
 
         <Modal
           dados={confirmacao}

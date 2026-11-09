@@ -536,9 +536,9 @@ function CartaoMetrica({ titulo, total, unidade, tema, dados, destaque, onSeleci
 
 function Caixa({ rotulo, valor, destaque }) {
   return (
-    <div className={`${C.caixa} px-2 py-2 text-center`}>
-      <div className="text-[10px] uppercase text-slate-500">{rotulo}</div>
-      <div className={`font-mono text-xs font-bold ${destaque ? 'text-sky-400' : 'text-white'}`}>{valor}</div>
+    <div className={`${C.caixa} px-2 py-2.5 text-center`}>
+      <div className="text-[11px] uppercase text-slate-400">{rotulo}</div>
+      <div className={`font-mono text-sm font-bold ${destaque ? 'text-sky-400' : 'text-white'}`}>{valor}</div>
     </div>
   );
 }
@@ -555,16 +555,16 @@ function CartaoVoo({ v, onEditar, onApagar }) {
     <div className={`${C.painel} space-y-4 p-5`}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</h3>
-          <p className="mt-1 text-[11px] uppercase text-slate-400">
+          <h3 className="text-base font-bold uppercase text-sky-400">{v.aeronave}</h3>
+          <p className="mt-1 text-xs uppercase text-slate-300">
             Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
           </p>
         </div>
         <div className="text-right">
-          <span className="inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">
+          <span className="inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-xs font-bold text-sky-300">
             {v.rota || '—'}
           </span>
-          <p className="mt-1 font-mono text-[10px] text-slate-500">{v.data_voo}</p>
+          <p className="mt-1 font-mono text-[11px] text-slate-400">{v.data_voo}</p>
         </div>
       </div>
 
@@ -575,8 +575,8 @@ function CartaoVoo({ v, onEditar, onApagar }) {
           ['Hora real', v.hora_real]
         ].map(([r, h]) => (
           <div key={r}>
-            <div className="text-[10px] uppercase text-slate-500">{r}</div>
-            <div className="font-mono text-xs font-bold text-white">{h || '--:--'}</div>
+            <div className="text-[11px] uppercase text-slate-400">{r}</div>
+            <div className="font-mono text-sm font-bold text-white">{h || '--:--'}</div>
           </div>
         ))}
       </div>
@@ -588,30 +588,30 @@ function CartaoVoo({ v, onEditar, onApagar }) {
         <Caixa rotulo="Total" valor={`${v.total_peso} KG`} destaque />
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-3 text-[11px] uppercase text-slate-400">
+      <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-3 text-xs uppercase text-slate-300">
         <span>
           Qtd bagagens: <b className="font-mono text-white">{v.qtd_bagagens}</b>
         </span>
-        <span className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 font-bold ${corEf}`}>
-          <Zap size={12} /> Efetividade: {fmtEf(ef)}
+        <span className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold ${corEf}`}>
+          <Zap size={13} /> Efetividade: {fmtEf(ef)}
         </span>
       </div>
 
-      <div className="flex items-center gap-2 rounded-lg border border-sky-900/60 bg-sky-950/30 px-3 py-2 text-[11px] uppercase text-sky-400">
+      <div className="flex items-center gap-2 rounded-lg border border-sky-900/60 bg-sky-950/30 px-3 py-2 text-xs uppercase text-sky-400">
         <CalendarDays size={14} /> Dia: <b className="font-mono text-white">{diaSemana(v.data_voo)}</b>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
-        <span className="rounded-lg border border-slate-800 bg-[#050a16] px-2.5 py-1.5 text-[10px] uppercase text-slate-400">
+        <span className="rounded-lg border border-slate-800 bg-[#050a16] px-2.5 py-1.5 text-[11px] uppercase text-slate-400">
           Última alt. por: <b className="font-mono text-white">{v.ultima_alt_por || '—'}</b>{' '}
           <span className="font-mono text-sky-300">({fmtTs(v.ultima_alt_em)})</span>
         </span>
-        <div className="flex items-center gap-4 text-[11px] font-bold uppercase">
+        <div className="flex items-center gap-4 text-xs font-bold uppercase">
           <button onClick={() => onEditar(v)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
-            <Pencil size={13} /> Editar
+            <Pencil size={14} /> Editar
           </button>
           <button onClick={() => onApagar(v)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
-            <Trash2 size={13} /> Apagar
+            <Trash2 size={14} /> Apagar
           </button>
         </div>
       </div>
@@ -948,8 +948,8 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
           pax: '', peso_pax: '', peso_bagagem: '', qtd_bagagens: ''
         }
   );
-  const [prev, setPrev] = useState('');
-  const [real, setReal] = useState('');
+  const [prev, setPrev] = useState(voo?.lista_prevista || '');
+  const [real, setReal] = useState(voo?.lista_real || '');
   const [salvando, setSalvando] = useState(false);
 
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
@@ -991,6 +991,8 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
         peso_bagagem: Number(f.peso_bagagem) || 0,
         total_peso: totalPeso,
         qtd_bagagens: Number(f.qtd_bagagens) || 0,
+        lista_prevista: prev.toUpperCase(),
+        lista_real: real.toUpperCase(),
         ...cruz
       },
       voo?.id

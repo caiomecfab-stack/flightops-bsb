@@ -289,6 +289,8 @@ function FundoAeronaves() {
           from { transform: translateX(-520px); }
           to { transform: translateX(calc(100vw + 520px)); }
         }
+        input:not([type="password"]):not([type="date"]):not([type="month"]):not([type="number"]):not(.sem-caixa),
+        textarea { text-transform: uppercase; }
         .fundo-aviao { left: 0; animation: fundo-cruzar 22s linear forwards; }
         @media (prefers-reduced-motion: reduce) {
           .fundo-aviao { animation: none; left: 35%; }
@@ -712,7 +714,7 @@ function TelaLogin({ onEntrar, online }) {
             <div className="relative">
               <input
                 type={ver ? 'text' : 'password'}
-                className={`${C.input} pr-11`}
+                className={`${C.input} pr-11 sem-caixa`}
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="••••••••"
@@ -1947,4 +1949,3 @@ export default function App() {
     </>
   );
 }
-

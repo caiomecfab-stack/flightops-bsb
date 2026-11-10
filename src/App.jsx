@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BarChart3, Database, PlusCircle, UserCheck, Plane, Printer, Users, ChevronLeft,
   Menu, LogOut, Filter, PieChart, Pencil, Trash2, CalendarDays, Zap,
-  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle, Eye, EyeOff, ChevronDown, Check
+  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle, Eye, EyeOff, ChevronDown, Check, MapPin, CheckCircle2
 } from 'lucide-react';
 import { supabase, supabaseConfigurado } from './supabase.js';
 
@@ -171,6 +171,48 @@ const formatarRota = (novo, anterior = '') => {
 // Remove o traço que sobra no final ao sair do campo ou salvar
 const limparRota = (rota) =>
   (rota || '').toUpperCase().replace(/[^A-Z0-9]/g, '').match(/.{1,4}/g)?.join('-') || '';
+
+// Destinos = todos os códigos da rota depois do primeiro (origem)
+const destinosDaRota = (rota) => codigosRota(rota).slice(1);
+
+// Pax do voo; se houver filtro de localidade e o voo tiver divisão por destino, conta só aquele destino
+const paxDoVoo = (v, local) => {
+  if (local && Array.isArray(v.pax_destinos) && v.pax_destinos.length) {
+    return v.pax_destinos.filter((d) => d.destino === local).reduce((s, d) => s + (Number(d.pax) || 0), 0);
+  }
+  return Number(v.pax) || 0;
+};
+
+// Sequência: dia mais recente primeiro; dentro do dia, decolagem mais cedo primeiro
+const ordenarPorDecolagem = (lista) =>
+  [...lista].sort((a, b) => {
+    if (a.data_voo !== b.data_voo) return a.data_voo < b.data_voo ? 1 : -1;
+    const ma = minutos(a.hora_decolagem);
+    const mb = minutos(b.hora_decolagem);
+    if (ma === null && mb === null) return 0;
+    if (ma === null) return 1;
+    if (mb === null) return -1;
+    return ma - mb;
+  });
+
+// Campos que faltam preencher (a matrícula NÃO é considerada)
+const camposFaltando = (v) => {
+  const f = [];
+  if (!v.aeronave) f.push('Aeronave');
+  if (!v.rota) f.push('Rota');
+  if (!v.data_voo) f.push('Data');
+  if (!v.hora_chamada) f.push('Hora de chamada');
+  if (!v.hora_decolagem) f.push('Decolagem');
+  if (!v.hora_real) f.push('Hora real');
+  if (!(v.pax > 0)) f.push('Pax');
+  if (!(v.peso_pax > 0)) f.push('Peso pax');
+  if (!(v.peso_bagagem > 0)) f.push('Peso bagagem');
+  if (!(v.qtd_bagagens > 0)) f.push('Qtd bagagens');
+  if (destinosDaRota(v.rota).length >= 2 && !(Array.isArray(v.pax_destinos) && v.pax_destinos.length > 0)) {
+    f.push('Pax por destino');
+  }
+  return f;
+};
 
 // Os filtros só passam a valer quando o botão "Gerar filtros" é clicado
 function useFiltro() {
@@ -419,14 +461,22 @@ function SeletorAeronaves({ valor, aeronaves, onChange }) {
       </button>
       {aberto && (
         <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[240px] rounded-xl border border-slate-700 bg-[#050a16] p-2 shadow-2xl">
-          <div className="mb-1 flex items-center justify-between px-1 pb-1 text-[10px] font-bold uppercase">
-            <button type="button" onClick={() => onChange(aeronaves.map((a) => a.modelo))} className="text-sky-400 hover:underline">
-              Marcar todas
-            </button>
-            <button type="button" onClick={() => onChange([])} className="text-rose-400 hover:underline">
-              Limpar
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => onChange([])}
+            className={`mb-1 flex w-full items-center gap-2 rounded-lg border px-2 py-2 text-left font-mono text-[11px] font-bold uppercase ${
+              valor.length === 0 ? 'border-sky-600 bg-sky-950/40 text-sky-300' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                valor.length === 0 ? 'border-sky-500 bg-sky-600' : 'border-slate-600'
+              }`}
+            >
+              {valor.length === 0 && <Check size={11} className="text-white" />}
+            </span>
+            TODAS AS AERONAVES
+          </button>
           <div className="max-h-56 overflow-y-auto">
             {aeronaves.map((a) => {
               const marcado = valor.includes(a.modelo);
@@ -679,8 +729,9 @@ function Caixa({ rotulo, valor, destaque }) {
   );
 }
 
-function CartaoVoo({ v, onEditar, onApagar, podeEditar }) {
+function CartaoVoo({ v, ordem, onEditar, onApagar, podeEditar }) {
   const ef = calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real);
+  const faltando = camposFaltando(v);
   const corEf =
     ef === null
       ? 'border-slate-700 text-slate-400'
@@ -727,6 +778,17 @@ function CartaoVoo({ v, onEditar, onApagar, podeEditar }) {
         <Caixa rotulo="Total" valor={`${v.total_peso} KG`} destaque />
       </div>
 
+      {Array.isArray(v.pax_destinos) && v.pax_destinos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-[#050a16] px-3 py-2 text-[11px] uppercase text-slate-400">
+          <MapPin size={13} className="text-sky-400" /> Pax por destino:
+          {v.pax_destinos.map((d, i) => (
+            <span key={i} className="rounded bg-slate-800/80 px-2 py-0.5 font-mono font-bold text-white">
+              {d.destino} <span className="text-sky-300">{d.pax}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-3 text-xs uppercase text-slate-300">
         <span>
           Qtd bagagens: <b className="font-mono text-white">{v.qtd_bagagens}</b>
@@ -738,7 +800,21 @@ function CartaoVoo({ v, onEditar, onApagar, podeEditar }) {
 
       <div className="flex items-center gap-2 rounded-lg border border-sky-900/60 bg-sky-950/30 px-3 py-2 text-xs uppercase text-sky-400">
         <CalendarDays size={14} /> Dia: <b className="font-mono text-white">{diaSemana(v.data_voo)}</b>
+        {ordem ? <span className="ml-auto font-mono text-[11px] text-sky-300">{ordem}º DECOLAGEM DO DIA</span> : null}
       </div>
+
+      {faltando.length === 0 ? (
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-2 text-xs font-bold uppercase text-emerald-400">
+          <CheckCircle2 size={14} /> Dados do voo completos
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs font-bold uppercase text-amber-400">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <span>
+            Dados incompletos — falta: <span className="font-mono text-white">{faltando.join(', ')}</span>
+          </span>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
         <span className="rounded-lg border border-slate-800 bg-[#050a16] px-2.5 py-1.5 text-[11px] uppercase text-slate-400">
@@ -971,7 +1047,7 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
       return {
         aeronave: nome,
         voos: lv.length,
-        pax: somar(lv, 'pax'),
+        pax: lv.reduce((t, v) => t + paxDoVoo(v, f.local), 0),
         desemb: somar(ld, 'desembarcados'),
         pesoPax: somar(lv, 'peso_pax'),
         bagagem: somar(lv, 'peso_bagagem'),
@@ -989,7 +1065,7 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
 
   const cartoes = [
     ['Total de voos', filtrados.length, '', TEMAS.sky, 'voos'],
-    ['Total de passageiros (PAX)', somar(filtrados, 'pax'), '', TEMAS.emerald, 'pax'],
+    ['Total de passageiros (PAX)', filtrados.reduce((t, v) => t + paxDoVoo(v, f.local), 0), '', TEMAS.emerald, 'pax'],
     ['Total desembarcados', somar(filtDesemb, 'desembarcados'), '', TEMAS.cyan, 'desemb'],
     ['Peso total pax', somar(filtrados, 'peso_pax'), 'KG', TEMAS.indigo, 'pesoPax'],
     ['Peso total de bagagem', somar(filtrados, 'peso_bagagem'), 'KG', TEMAS.amber, 'bagagem'],
@@ -1103,11 +1179,24 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
 
 function TelaPainel({ voos, aeronaves, onEditar, onApagar, podeEditar }) {
   const filtro = useFiltro();
-  const lista = useMemo(() => filtrarVoos(voos, filtro.aplicado), [voos, filtro.aplicado]);
+  const lista = useMemo(
+    () => ordenarPorDecolagem(filtrarVoos(voos, filtro.aplicado)),
+    [voos, filtro.aplicado]
+  );
   const localidades = useMemo(
     () => [...new Set(voos.flatMap((v) => codigosRota(v.rota)))].filter((c) => c !== 'SBBR').sort(),
     [voos]
   );
+  const dias = useMemo(() => {
+    const m = new Map();
+    lista.forEach((v) => {
+      if (!m.has(v.data_voo)) m.set(v.data_voo, []);
+      m.get(v.data_voo).push(v);
+    });
+    return [...m.entries()];
+  }, [lista]);
+  const completos = lista.filter((v) => camposFaltando(v).length === 0).length;
+
   return (
     <div className="space-y-6">
       <div className={`${C.painel} space-y-4 p-5`}>
@@ -1133,18 +1222,34 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar, podeEditar }) {
         </div>
         <BotoesFiltro filtro={filtro} />
       </div>
-      <div className={`${C.painel} flex items-center justify-between px-5 py-4`}>
-        <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
-        <span className="font-mono text-[11px] uppercase text-slate-400">{lista.length} registos</span>
+
+      <div className={`${C.painel} flex flex-wrap items-center justify-between gap-2 px-5 py-4`}>
+        <div>
+          <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
+          <p className="mt-1 text-[10px] uppercase text-slate-500">Sequência por data e hora de decolagem</p>
+        </div>
+        <div className="flex items-center gap-4 font-mono text-[11px] uppercase">
+          <span className="text-slate-400">{lista.length} registos</span>
+          <span className="text-emerald-400">{completos} completos</span>
+        </div>
       </div>
+
       {lista.length === 0 ? (
         <p className="py-10 text-center text-xs uppercase text-slate-500">Nenhum voo encontrado.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          {lista.map((v) => (
-            <CartaoVoo key={v.id} v={v} onEditar={onEditar} onApagar={onApagar} podeEditar={podeEditar} />
-          ))}
-        </div>
+        dias.map(([data, vs]) => (
+          <div key={data} className="space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-2 text-xs font-bold uppercase text-sky-400">
+              <CalendarDays size={14} /> {fmtData(data)} — {diaSemana(data)}
+              <span className="ml-auto font-mono text-[11px] text-slate-400">{vs.length} voo(s)</span>
+            </div>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              {vs.map((v, i) => (
+                <CartaoVoo key={v.id} v={v} ordem={i + 1} onEditar={onEditar} onApagar={onApagar} podeEditar={podeEditar} />
+              ))}
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
@@ -1174,6 +1279,13 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
   );
   const [prev, setPrev] = useState(voo?.lista_prevista || '');
   const [real, setReal] = useState(voo?.lista_real || '');
+  const [paxDest, setPaxDest] = useState(() => {
+    const o = {};
+    (voo?.pax_destinos || []).forEach((d, i) => {
+      o[i] = String(d.pax ?? '');
+    });
+    return o;
+  });
   const [salvando, setSalvando] = useState(false);
 
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
@@ -1181,6 +1293,12 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
   const fecharHora = (k) => () => setF((s) => ({ ...s, [k]: normHora(s[k]) }));
 
   const totalPeso = (Number(f.peso_pax) || 0) + (Number(f.peso_bagagem) || 0);
+
+  // Rota com mais de um destino (ex: SBBR-SBGR-SBGL): abre a divisão de pax por destino
+  const destinos = useMemo(() => destinosDaRota(f.rota), [f.rota]);
+  const mostraDivisao = destinos.length >= 2;
+  const somaDest = destinos.reduce((s, _, i) => s + (Number(paxDest[i]) || 0), 0);
+  const usaDivisao = mostraDivisao && destinos.some((_, i) => paxDest[i] !== undefined && paxDest[i] !== '');
   const temListas = Boolean(prev.trim() || real.trim());
   const cruz = useMemo(
     () =>
@@ -1200,6 +1318,10 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
     e.preventDefault();
     const aeronave = f.aeronave || aeronaves[0]?.modelo;
     if (!aeronave) return avisar('Cadastre uma aeronave antes de adicionar voos.', 'erro');
+    const paxTotal = f.pax === '' ? (usaDivisao ? somaDest : 0) : Number(f.pax) || 0;
+    if (usaDivisao && paxTotal !== somaDest) {
+      return avisar(`A soma dos pax por destino (${somaDest}) deve ser igual ao total de PAX (${paxTotal}).`, 'erro');
+    }
     setSalvando(true);
     await onSalvar(
       {
@@ -1210,7 +1332,8 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
         hora_chamada: normHora(f.hora_chamada),
         hora_decolagem: normHora(f.hora_decolagem),
         hora_real: normHora(f.hora_real),
-        pax: Number(f.pax) || 0,
+        pax: paxTotal,
+        pax_destinos: usaDivisao ? destinos.map((d, i) => ({ destino: d, pax: Number(paxDest[i]) || 0 })) : null,
         peso_pax: Number(f.peso_pax) || 0,
         peso_bagagem: Number(f.peso_bagagem) || 0,
         total_peso: totalPeso,
@@ -1285,6 +1408,46 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
         </Campo>
         <Campo rotulo="Quantidade de bagagens"><input {...num('qtd_bagagens')} /></Campo>
       </div>
+
+      {mostraDivisao && (
+        <div className={`${C.caixa} space-y-3 p-4`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase text-sky-400">
+              <MapPin size={13} /> Pax por destino — {codigosRota(f.rota).join(' → ')}
+            </div>
+            <span
+              className={`font-mono text-[11px] font-bold uppercase ${
+                !usaDivisao || f.pax === ''
+                  ? 'text-slate-400'
+                  : somaDest === (Number(f.pax) || 0)
+                  ? 'text-emerald-400'
+                  : 'text-amber-400'
+              }`}
+            >
+              Soma: {somaDest} / Total PAX: {f.pax === '' ? '—' : f.pax}
+            </span>
+          </div>
+          <p className="text-[10px] text-slate-500">
+            Esta rota tem mais de um destino: informe quantos passageiros vão para cada um. Se deixar o Total de PAX em
+            branco, ele será a soma. Deixe tudo em branco para não dividir.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {destinos.map((d, i) => (
+              <Campo key={i} rotulo={`${i + 1}º destino — ${d}`}>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  className={C.input}
+                  value={paxDest[i] ?? ''}
+                  onChange={(e) => setPaxDest((st) => ({ ...st, [i]: e.target.value }))}
+                  placeholder="0"
+                />
+              </Campo>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-5 md:grid-cols-2">
         <div>
@@ -1592,7 +1755,14 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
                   {v.aeronave}{v.matricula ? ` (${v.matricula})` : ''}
                 </td>
                 <td className="px-3 py-3 font-mono">{v.rota}</td>
-                <td className="px-3 py-3 font-mono font-bold">{v.pax}</td>
+                <td className="px-3 py-3 font-mono font-bold">
+                  {v.pax}
+                  {Array.isArray(v.pax_destinos) && v.pax_destinos.length > 0 && (
+                    <div className="text-[9px] font-normal text-slate-500">
+                      {v.pax_destinos.map((d) => `${d.destino}: ${d.pax}`).join(' · ')}
+                    </div>
+                  )}
+                </td>
                 <td className="px-3 py-3 font-mono font-bold">{v.total_peso} KG</td>
                 <td className="px-3 py-3 font-mono font-bold text-emerald-700">
                   {fmtEf(calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real))}

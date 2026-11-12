@@ -3,9 +3,13 @@ import { createPortal } from 'react-dom';
 import {
   BarChart3, Database, PlusCircle, UserCheck, Plane, Printer, Users, ChevronLeft,
   Menu, LogOut, Filter, PieChart, Pencil, Trash2, CalendarDays, Zap,
-  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle, Eye, EyeOff, ChevronDown, Check, MapPin, CheckCircle2
+  ShieldCheck, KeyRound, UserPlus, RotateCcw, FileText, AlertTriangle, Eye, EyeOff, Clock
 } from 'lucide-react';
 import { supabase, supabaseConfigurado } from './supabase.js';
+
+/* Nome exibido no app e crédito de criação (altere aqui se quiser) */
+const NOME_APP = 'PCAN-BR';
+const CRIADOR = 'CAIO';
 
 /* ================================================================
    ESTILOS REUTILIZÁVEIS
@@ -142,14 +146,13 @@ const cruzar = (txtPrevisto, txtReal) => {
 
 /* ---------------------------------------------------------------
    FILTROS (valem para voos e para desembarques)
-   aeronave agora é uma LISTA (várias aeronaves ao mesmo tempo)
    --------------------------------------------------------------- */
-const FILTRO_VAZIO = { aeronave: [], inicial: '', final: '', data: '', mes: '', local: '' };
+const FILTRO_VAZIO = { aeronave: '', inicial: '', final: '', data: '', mes: '', local: '' };
 const codigosRota = (rota) => (rota || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 
 const filtrarVoos = (lista, f) =>
   lista.filter((v) => {
-    if (f.aeronave.length > 0 && !f.aeronave.includes(v.aeronave)) return false;
+    if (f.aeronave && v.aeronave !== f.aeronave) return false;
     if (f.inicial && v.data_voo < f.inicial) return false;
     if (f.final && v.data_voo > f.final) return false;
     if (f.data && v.data_voo !== f.data) return false;
@@ -160,72 +163,116 @@ const filtrarVoos = (lista, f) =>
 
 const somar = (lista, campo) => lista.reduce((s, v) => s + (Number(v[campo]) || 0), 0);
 
-// Rota: coloca o traço sozinho depois de cada código de 4 letras (SBBRSBGL → SBBR-SBGL)
-const formatarRota = (novo, anterior = '') => {
-  const limpo = novo.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  let r = (limpo.match(/.{1,4}/g) || []).join('-');
-  const apagando = novo.length < anterior.length;
-  if (!apagando && limpo.length > 0 && limpo.length % 4 === 0) r += '-';
-  return r;
-};
-// Remove o traço que sobra no final ao sair do campo ou salvar
-const limparRota = (rota) =>
-  (rota || '').toUpperCase().replace(/[^A-Z0-9]/g, '').match(/.{1,4}/g)?.join('-') || '';
-
-// Destinos = todos os códigos da rota depois do primeiro (origem)
-const destinosDaRota = (rota) => codigosRota(rota).slice(1);
-
-// Pax do voo; se houver filtro de localidade e o voo tiver divisão por destino, conta só aquele destino
-const paxDoVoo = (v, local) => {
-  if (local && Array.isArray(v.pax_destinos) && v.pax_destinos.length) {
-    return v.pax_destinos.filter((d) => d.destino === local).reduce((s, d) => s + (Number(d.pax) || 0), 0);
-  }
-  return Number(v.pax) || 0;
-};
-
-// Sequência: dia mais recente primeiro; dentro do dia, decolagem mais cedo primeiro
-const ordenarPorDecolagem = (lista) =>
-  [...lista].sort((a, b) => {
-    if (a.data_voo !== b.data_voo) return a.data_voo < b.data_voo ? 1 : -1;
-    const ma = minutos(a.hora_decolagem);
-    const mb = minutos(b.hora_decolagem);
-    if (ma === null && mb === null) return 0;
-    if (ma === null) return 1;
-    if (mb === null) return -1;
-    return ma - mb;
-  });
-
-// Campos que faltam preencher (a matrícula NÃO é considerada)
-const camposFaltando = (v) => {
-  const f = [];
-  if (!v.aeronave) f.push('Aeronave');
-  if (!v.rota) f.push('Rota');
-  if (!v.data_voo) f.push('Data');
-  if (!v.hora_chamada) f.push('Hora de chamada');
-  if (!v.hora_decolagem) f.push('Decolagem');
-  if (!v.hora_real) f.push('Hora real');
-  if (!(v.pax > 0)) f.push('Pax');
-  if (!(v.peso_pax > 0)) f.push('Peso pax');
-  if (!(v.peso_bagagem > 0)) f.push('Peso bagagem');
-  if (!(v.qtd_bagagens > 0)) f.push('Qtd bagagens');
-  if (destinosDaRota(v.rota).length >= 2 && !(Array.isArray(v.pax_destinos) && v.pax_destinos.length > 0)) {
-    f.push('Pax por destino');
-  }
-  return f;
-};
-
-// Os filtros só passam a valer quando o botão "Gerar filtros" é clicado
+// Os filtros só passam a valer quando o botão "Gerar filtros" é clicado.
+// "Desfazer filtro" volta ao filtro aplicado anteriormente.
 function useFiltro() {
   const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
   const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
-  const pendente = JSON.stringify(rascunho) !== JSON.stringify(aplicado);
-  const gerar = () => setAplicado(rascunho);
+  const [pilha, setPilha] = useState([]);
+  const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const pendente = !igual(rascunho, aplicado);
+  const guardar = (f) => setPilha((p) => [...p.slice(-19), f]);
+
+  const gerar = () => {
+    if (!igual(rascunho, aplicado)) guardar(aplicado);
+    setAplicado(rascunho);
+  };
   const limpar = () => {
+    if (!igual(aplicado, FILTRO_VAZIO)) guardar(aplicado);
     setRascunho(FILTRO_VAZIO);
     setAplicado(FILTRO_VAZIO);
   };
-  return { rascunho, setRascunho, aplicado, gerar, limpar, pendente };
+  const desfazer = () => {
+    if (!pilha.length) return;
+    const anterior = pilha[pilha.length - 1];
+    setPilha((p) => p.slice(0, -1));
+    setAplicado(anterior);
+    setRascunho(anterior);
+  };
+  return { rascunho, setRascunho, aplicado, gerar, limpar, desfazer, podeDesfazer: pilha.length > 0, pendente };
 }
+
+/* ---------------------------------------------------------------
+   ROTA, PENDÊNCIAS E HISTÓRICO DE ALTERAÇÕES
+   --------------------------------------------------------------- */
+// Coloca o traço automaticamente depois de cada código de 4 letras (ex.: SBBR-SBGL)
+const formatarRota = (raw, anterior = '') => {
+  const texto = String(raw || '');
+  const limpo = texto.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let saida = (limpo.match(/.{1,4}/g) || []).join('-');
+  if (limpo.length > 0 && limpo.length % 4 === 0 && texto.length === String(anterior).length + 1) saida += '-';
+  return saida;
+};
+const fecharRota = (v) => String(v || '').replace(/-+$/, '');
+// Destinos = todos os códigos da rota, exceto o primeiro (origem)
+const destinosDaRota = (rota) => [...new Set(codigosRota(rota).slice(1))];
+const vazio = (x) => x === '' || x === null || x === undefined;
+const contarNomes = (t) => new Set(String(t || '').split('\n').map(limparNome).filter(Boolean)).size;
+
+// Lista de pendências de um voo (usada no alerta ao salvar e na tira do Painel de Voos)
+const pendenciasVoo = (d) => {
+  const p = [];
+  const faltaHora = [];
+  if (!d.hora_chamada) faltaHora.push('chamada');
+  if (!d.hora_decolagem) faltaHora.push('decolagem');
+  if (!d.hora_real) faltaHora.push('hora real');
+  if (faltaHora.length) p.push(`Horários não preenchidos: ${faltaHora.join(', ')}`);
+  if (!String(d.rota || '').trim()) p.push('Rota não informada');
+  if (vazio(d.pax) || Number(d.pax) === 0) p.push('Total de PAX não informado');
+  if (vazio(d.peso_pax)) p.push('Peso de PAX não informado');
+  if (vazio(d.peso_bagagem)) p.push('Peso de bagagem não informado');
+  if (vazio(d.qtd_bagagens)) p.push('Quantidade de bagagens não informada');
+  if (!String(d.lista_prevista || '').trim()) p.push('Faltam nomes na relação principal');
+  if (!String(d.lista_real || '').trim()) p.push('Faltam nomes em efetivamente embarcados');
+  const dest = destinosDaRota(d.rota);
+  if (dest.length > 1) {
+    const mapa = d.pax_destinos || {};
+    const soma = dest.reduce((s, c) => s + (Number(mapa[c]) || 0), 0);
+    const total = Number(d.pax) || 0;
+    if (soma !== total) p.push(`PAX por destino (${soma}) diferente do PAX total (${total})`);
+  }
+  return p;
+};
+
+const ROTULOS_CAMPOS = {
+  aeronave: 'Aeronave', matricula: 'Matrícula', rota: 'Rota', data_voo: 'Data',
+  hora_chamada: 'Chamada', hora_decolagem: 'Decolagem', hora_real: 'Hora real',
+  pax: 'PAX', peso_pax: 'Peso PAX', peso_bagagem: 'Peso bagagem', total_peso: 'Peso total',
+  qtd_bagagens: 'Qtd bagagens', total_previsto: 'Total previsto', embarcados: 'Embarcados',
+  faltas: 'Faltas', extras: 'Extras', desembarcados: 'Desembarcados', excluido: 'Na lixeira',
+  lista_prevista: 'Relação principal', lista_real: 'Efetivamente embarcados', pax_destinos: 'PAX por destino'
+};
+const IGNORAR_CAMPOS = new Set(['id', 'criado_em', 'ultima_alt_por', 'ultima_alt_em', 'excluido_em', 'excluido_por']);
+const fmtValor = (campo, v) => {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'SIM' : 'NÃO';
+  if (campo === 'pax_destinos') {
+    const e = Object.entries(v);
+    return e.length ? e.map(([k, x]) => `${k}: ${x}`).join(', ') : '—';
+  }
+  if (campo === 'data_voo') return fmtData(String(v));
+  return String(v);
+};
+// Compara o registo antes e depois e devolve só o que mudou
+const diferencas = (antes, depois) => {
+  if (!antes || !depois) return [];
+  return Object.keys(depois)
+    .filter((k) => !IGNORAR_CAMPOS.has(k) && JSON.stringify(antes[k]) !== JSON.stringify(depois[k]))
+    .map((k) =>
+      k === 'lista_prevista' || k === 'lista_real'
+        ? { campo: ROTULOS_CAMPOS[k], texto: 'texto atualizado' }
+        : { campo: ROTULOS_CAMPOS[k] || k, de: fmtValor(k, antes[k]), para: fmtValor(k, depois[k]) }
+    );
+};
+const resumoVoo = (v) => `${v.aeronave} · ${fmtData(v.data_voo)}${v.matricula ? ` · ${v.matricula}` : ''}`;
+const resumoDesemb = (d) => `${d.aeronave} · ${fmtData(d.data_voo)} · ${d.desembarcados} desemb.`;
+const ROTULO_TABELA = { voos: 'voo', desembarques: 'desembarque', aeronaves: 'aeronave', usuarios: 'utilizador' };
+const COR_ACAO = {
+  incluiu: 'border-emerald-700 text-emerald-400',
+  alterou: 'border-sky-700 text-sky-300',
+  excluiu: 'border-rose-700 text-rose-400',
+  restaurou: 'border-amber-700 text-amber-400'
+};
 
 /* ================================================================
    FUNDO ANIMADO COM AERONAVES DA FAB
@@ -373,50 +420,6 @@ function FundoAeronaves() {
 /* ================================================================
    COMPONENTES PEQUENOS
    ================================================================ */
-const PERFIS = { admin: 'Admin', operador: 'Operador', observador: 'Observador' };
-
-const HELICOPTERO = (
-  <g {...traco}>
-    <rect x="28" y="8" width="132" height="4" rx="2" />
-    <rect x="91" y="12" width="6" height="10" />
-    <path d="M58 36 Q58 22 92 22 L128 22 Q150 24 152 38 L150 48 Q140 54 100 54 L70 54 Q56 50 58 36 Z" />
-    <path d="M148 30 L204 26 L206 34 L150 42 Z" />
-    <path d="M196 14 L210 14 L210 40 L204 40 Z" />
-    <path d="M68 61 L148 61" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    <path d="M86 54 L84 61 M126 54 L128 61" stroke="currentColor" strokeWidth="2" />
-  </g>
-);
-
-// Escolhe o desenho conforme o tipo de aeronave escrito
-const desenhoDoModelo = (modelo) => {
-  const m = (modelo || '').toUpperCase();
-  if (/H-\d|HAWK|CARACAL|HELI/.test(m)) return HELICOPTERO;
-  const id = m.includes('KC-390')
-    ? 'kc390'
-    : m.includes('KC-30')
-    ? 'kc30'
-    : m.includes('C-105')
-    ? 'c105'
-    : m.includes('C-99')
-    ? 'c99'
-    : m.includes('C-98')
-    ? 'c98'
-    : m.includes('C-97')
-    ? 'c97'
-    : m.includes('C-95')
-    ? 'c98'
-    : null;
-  return (AVIOES.find((a) => a.id === id) || AVIOES[3]).desenho;
-};
-
-function IconeAeronave({ modelo, className = 'w-24' }) {
-  return (
-    <svg viewBox="0 0 220 70" className={`${className} shrink-0 text-sky-300`} fill="currentColor" role="img" aria-label={modelo}>
-      {desenhoDoModelo(modelo)}
-    </svg>
-  );
-}
-
 function Campo({ rotulo, children, className = '' }) {
   return (
     <div className={className}>
@@ -426,104 +429,17 @@ function Campo({ rotulo, children, className = '' }) {
   );
 }
 
-function SeletorAeronaves({ valor, aeronaves, onChange }) {
-  const [aberto, setAberto] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!aberto) return undefined;
-    const fora = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setAberto(false);
-    };
-    document.addEventListener('mousedown', fora);
-    document.addEventListener('touchstart', fora);
-    return () => {
-      document.removeEventListener('mousedown', fora);
-      document.removeEventListener('touchstart', fora);
-    };
-  }, [aberto]);
-
-  const alternar = (modelo) =>
-    onChange(valor.includes(modelo) ? valor.filter((m) => m !== modelo) : [...valor, modelo]);
-
-  const resumo =
-    valor.length === 0 ? 'TODAS AS AERONAVES' : valor.length === 1 ? valor[0] : `${valor.length} AERONAVES SELECIONADAS`;
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setAberto((a) => !a)}
-        className={`${C.input} flex items-center justify-between gap-2 text-left`}
-      >
-        <span className="truncate">{resumo}</span>
-        <ChevronDown size={14} className={`shrink-0 text-slate-400 transition ${aberto ? 'rotate-180' : ''}`} />
-      </button>
-      {aberto && (
-        <div className="absolute left-0 top-full z-40 mt-1 w-full min-w-[240px] rounded-xl border border-slate-700 bg-[#050a16] p-2 shadow-2xl">
-          <button
-            type="button"
-            onClick={() => onChange([])}
-            className={`mb-1 flex w-full items-center gap-2 rounded-lg border px-2 py-2 text-left font-mono text-[11px] font-bold uppercase ${
-              valor.length === 0 ? 'border-sky-600 bg-sky-950/40 text-sky-300' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                valor.length === 0 ? 'border-sky-500 bg-sky-600' : 'border-slate-600'
-              }`}
-            >
-              {valor.length === 0 && <Check size={11} className="text-white" />}
-            </span>
-            TODAS AS AERONAVES
-          </button>
-          <div className="max-h-56 overflow-y-auto">
-            {aeronaves.map((a) => {
-              const marcado = valor.includes(a.modelo);
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => alternar(a.modelo)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left font-mono text-[11px] uppercase hover:bg-slate-800 ${
-                    marcado ? 'text-sky-300' : 'text-slate-300'
-                  }`}
-                >
-                  <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                      marcado ? 'border-sky-500 bg-sky-600' : 'border-slate-600'
-                    }`}
-                  >
-                    {marcado && <Check size={11} className="text-white" />}
-                  </span>
-                  {a.modelo}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={() => setAberto(false)}
-            className="mt-2 w-full rounded-lg bg-sky-600 py-2 text-[11px] font-bold uppercase text-white hover:bg-sky-500"
-          >
-            Pronto
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function CamposFiltro({ f, setF, aeronaves, comMes = true, rotulos = {} }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return (
     <>
-      <Campo rotulo="Aeronave(s) FAB">
-        <SeletorAeronaves
-          valor={f.aeronave}
-          aeronaves={aeronaves}
-          onChange={(lista) => setF({ ...f, aeronave: lista })}
-        />
+      <Campo rotulo="Aeronave FAB">
+        <select className={C.input} value={f.aeronave} onChange={set('aeronave')}>
+          <option value="">TODAS AS AERONAVES</option>
+          {aeronaves.map((a) => (
+            <option key={a.id} value={a.modelo}>{a.modelo}</option>
+          ))}
+        </select>
       </Campo>
       <Campo rotulo={rotulos.inicial || 'Data inicial'}>
         <input type="date" className={C.input} value={f.inicial} onChange={set('inicial')} />
@@ -548,6 +464,15 @@ function BotoesFiltro({ filtro }) {
     <div className="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
       <button type="button" onClick={filtro.gerar} className={`${C.botao} flex items-center gap-2`}>
         <Filter size={14} /> Gerar filtros
+      </button>
+      <button
+        type="button"
+        onClick={filtro.desfazer}
+        disabled={!filtro.podeDesfazer}
+        className={`${C.botaoSec} flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40`}
+        title="Volta ao filtro aplicado anteriormente"
+      >
+        <RotateCcw size={14} /> Desfazer filtro
       </button>
       <button type="button" onClick={filtro.limpar} className={C.botaoSec}>
         Limpar
@@ -729,108 +654,77 @@ function Caixa({ rotulo, valor, destaque }) {
   );
 }
 
-function CartaoVoo({ v, ordem, onEditar, onApagar, podeEditar }) {
+function Celula({ rotulo, valor, sub, destaque }) {
+  return (
+    <div className="min-w-[64px]">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400">{rotulo}</div>
+      <div className={`font-mono text-sm font-bold ${destaque ? 'text-sky-400' : 'text-white'}`}>{valor}</div>
+      {sub && <div className="text-[10px] uppercase text-slate-500">{sub}</div>}
+    </div>
+  );
+}
+
+// Voo em forma de tira horizontal
+function TiraVoo({ v, onEditar, onApagar }) {
   const ef = calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real);
-  const faltando = camposFaltando(v);
   const corEf =
     ef === null
       ? 'border-slate-700 text-slate-400'
       : ef >= 100
       ? 'border-emerald-700 bg-emerald-950/40 text-emerald-400'
       : 'border-amber-700 bg-amber-950/40 text-amber-400';
+  const pend = pendenciasVoo(v);
+  const dest = destinosDaRota(v.rota);
+  const subPax = dest.length > 1 ? dest.map((c) => `${c} ${v.pax_destinos?.[c] ?? 0}`).join(' · ') : undefined;
+
   return (
-    <div className={`${C.painel} space-y-4 p-5`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <IconeAeronave modelo={v.aeronave} className="w-20" />
-          <div>
-            <h3 className="text-base font-bold uppercase text-sky-400">{v.aeronave}</h3>
-            <p className="mt-1 text-xs uppercase text-slate-300">
-              Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
-            </p>
-          </div>
+    <div className={`${C.painel} border-l-4 border-l-sky-500 px-5 py-4`}>
+      <div className="flex flex-wrap items-center gap-x-7 gap-y-3">
+        <div className="min-w-[170px] flex-1">
+          <h3 className="text-base font-bold uppercase text-sky-400">{v.aeronave}</h3>
+          <p className="text-xs uppercase text-slate-300">
+            Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
+          </p>
         </div>
-        <div className="text-right">
-          <span className="inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-xs font-bold text-sky-300">
+        <Celula rotulo="Data" valor={v.data_voo} sub={diaSemana(v.data_voo)} />
+        <div className="min-w-[110px]">
+          <div className="text-[10px] uppercase tracking-wide text-slate-400">Rota</div>
+          <span className="mt-0.5 inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-xs font-bold text-sky-300">
             {v.rota || '—'}
           </span>
-          <p className="mt-1 font-mono text-[11px] text-slate-400">{v.data_voo}</p>
         </div>
-      </div>
-
-      <div className={`${C.caixa} grid grid-cols-3 py-3 text-center`}>
-        {[
-          ['Chamada', v.hora_chamada],
-          ['Decolagem', v.hora_decolagem],
-          ['Hora real', v.hora_real]
-        ].map(([r, h]) => (
-          <div key={r}>
-            <div className="text-[11px] uppercase text-slate-400">{r}</div>
-            <div className="font-mono text-sm font-bold text-white">{h || '--:--'}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Caixa rotulo="Pax" valor={v.pax} />
-        <Caixa rotulo="Peso pax" valor={`${v.peso_pax} KG`} />
-        <Caixa rotulo="Bagagem" valor={`${v.peso_bagagem} KG`} />
-        <Caixa rotulo="Total" valor={`${v.total_peso} KG`} destaque />
-      </div>
-
-      {Array.isArray(v.pax_destinos) && v.pax_destinos.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-[#050a16] px-3 py-2 text-[11px] uppercase text-slate-400">
-          <MapPin size={13} className="text-sky-400" /> Pax por destino:
-          {v.pax_destinos.map((d, i) => (
-            <span key={i} className="rounded bg-slate-800/80 px-2 py-0.5 font-mono font-bold text-white">
-              {d.destino} <span className="text-sky-300">{d.pax}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between gap-2 border-t border-slate-800 pt-3 text-xs uppercase text-slate-300">
-        <span>
-          Qtd bagagens: <b className="font-mono text-white">{v.qtd_bagagens}</b>
-        </span>
-        <span className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold ${corEf}`}>
+        <Celula rotulo="Chamada" valor={v.hora_chamada || '--:--'} />
+        <Celula rotulo="Decolagem" valor={v.hora_decolagem || '--:--'} />
+        <Celula rotulo="Hora real" valor={v.hora_real || '--:--'} />
+        <Celula rotulo="Pax" valor={v.pax} sub={subPax} />
+        <Celula rotulo="Peso pax" valor={`${v.peso_pax} KG`} />
+        <Celula rotulo="Bagagem" valor={`${v.peso_bagagem} KG`} sub={`${v.qtd_bagagens} VOL.`} />
+        <Celula rotulo="Total" valor={`${v.total_peso} KG`} destaque />
+        <span className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold uppercase ${corEf}`}>
           <Zap size={13} /> Efetividade: {fmtEf(ef)}
         </span>
       </div>
 
-      <div className="flex items-center gap-2 rounded-lg border border-sky-900/60 bg-sky-950/30 px-3 py-2 text-xs uppercase text-sky-400">
-        <CalendarDays size={14} /> Dia: <b className="font-mono text-white">{diaSemana(v.data_voo)}</b>
-        {ordem ? <span className="ml-auto font-mono text-[11px] text-sky-300">{ordem}º DECOLAGEM DO DIA</span> : null}
-      </div>
-
-      {faltando.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-2 text-xs font-bold uppercase text-emerald-400">
-          <CheckCircle2 size={14} /> Dados do voo completos
-        </div>
-      ) : (
-        <div className="flex items-start gap-2 rounded-lg border border-amber-800 bg-amber-950/30 px-3 py-2 text-xs font-bold uppercase text-amber-400">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          <span>
-            Dados incompletos — falta: <span className="font-mono text-white">{faltando.join(', ')}</span>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          <span className="rounded-lg border border-slate-800 bg-[#050a16] px-2.5 py-1.5 text-[11px] uppercase text-slate-400">
+            Última alt. por: <b className="font-mono text-white">{v.ultima_alt_por || '—'}</b>{' '}
+            <span className="font-mono text-sky-300">({fmtTs(v.ultima_alt_em)})</span>
           </span>
+          {pend.length > 0 && (
+            <span className="flex items-start gap-1 text-[11px] text-amber-400">
+              <AlertTriangle size={13} className="mt-px shrink-0" /> {pend.join(' · ')}
+            </span>
+          )}
         </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-3">
-        <span className="rounded-lg border border-slate-800 bg-[#050a16] px-2.5 py-1.5 text-[11px] uppercase text-slate-400">
-          Última alt. por: <b className="font-mono text-white">{v.ultima_alt_por || '—'}</b>{' '}
-          <span className="font-mono text-sky-300">({fmtTs(v.ultima_alt_em)})</span>
-        </span>
-        {podeEditar && (
-          <div className="flex items-center gap-4 text-xs font-bold uppercase">
-            <button onClick={() => onEditar(v)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
-              <Pencil size={14} /> Editar
-            </button>
-            <button onClick={() => onApagar(v)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
-              <Trash2 size={14} /> Apagar
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-4 text-xs font-bold uppercase">
+          <button onClick={() => onEditar(v)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
+            <Pencil size={14} /> Editar
+          </button>
+          <button onClick={() => onApagar(v)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
+            <Trash2 size={14} /> Apagar
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -839,6 +733,7 @@ function CartaoVoo({ v, ordem, onEditar, onApagar, podeEditar }) {
 function Modal({ dados, onCancelar, onConfirmar }) {
   const [ocupado, setOcupado] = useState(false);
   if (!dados) return null;
+  const aviso = dados.tipo === 'aviso';
   const confirmar = async () => {
     setOcupado(true);
     await onConfirmar();
@@ -847,22 +742,34 @@ function Modal({ dados, onCancelar, onConfirmar }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
       <div className={`${C.painel} w-full max-w-md space-y-4 p-6`}>
-        <div className="flex items-center gap-3 text-rose-400">
+        <div className={`flex items-center gap-3 ${aviso ? 'text-amber-400' : 'text-rose-400'}`}>
           <AlertTriangle size={22} />
           <h3 className="text-sm font-bold uppercase">{dados.titulo}</h3>
         </div>
         <p className="text-xs leading-relaxed text-slate-300">{dados.texto}</p>
+        {dados.itens && dados.itens.length > 0 && (
+          <ul className="max-h-60 space-y-1.5 overflow-y-auto rounded-xl border border-amber-900/60 bg-amber-950/20 p-3 text-xs text-amber-200">
+            {dados.itens.map((i) => (
+              <li key={i} className="flex gap-2">
+                <span>•</span>
+                <span>{i}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="flex gap-3 pt-2">
           <button
             onClick={onCancelar}
             className="flex-1 rounded-xl border border-slate-700 py-3 text-xs font-bold uppercase text-slate-300 hover:bg-slate-800"
           >
-            Cancelar
+            {dados.botaoCancelar || 'Cancelar'}
           </button>
           <button
             onClick={confirmar}
             disabled={ocupado}
-            className="flex-1 rounded-xl bg-rose-600 py-3 text-xs font-bold uppercase text-white hover:bg-rose-500 disabled:opacity-50"
+            className={`flex-1 rounded-xl py-3 text-xs font-bold uppercase text-white disabled:opacity-50 ${
+              aviso ? 'bg-amber-600 hover:bg-amber-500' : 'bg-rose-600 hover:bg-rose-500'
+            }`}
           >
             {dados.botao || 'Confirmar'}
           </button>
@@ -875,14 +782,6 @@ function Modal({ dados, onCancelar, onConfirmar }) {
 /* ================================================================
    TELAS
    ================================================================ */
-function Rodape({ className = '' }) {
-  return (
-    <div className={`text-center text-[10px] font-bold uppercase tracking-widest text-slate-500 ${className}`}>
-      Criado por <span className="text-sky-400">CAIO</span> · FlightOps BSB
-    </div>
-  );
-}
-
 function TelaConfig() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#050a16] p-6 text-slate-200">
@@ -898,54 +797,51 @@ function TelaConfig() {
   );
 }
 
-function TelaLogin({ onEntrar, onSolicitar, online }) {
-  const [modo, setModo] = useState('entrar');
+function TelaLogin({ onEntrar, onVerificar, online }) {
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
-  const [confirma, setConfirma] = useState('');
   const [erro, setErro] = useState('');
-  const [info, setInfo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [ver, setVer] = useState(false);
-  const solicitando = modo === 'solicitar';
+  const [verif, setVerif] = useState(null);
+  const [verificando, setVerificando] = useState(false);
 
-  const trocarModo = (m) => {
-    setModo(m);
+  const mudarNome = (e) => {
+    setNome(e.target.value);
+    setVerif(null);
     setErro('');
-    setInfo('');
-    setSenha('');
-    setConfirma('');
+  };
+  const mudarSenha = (e) => {
+    setSenha(e.target.value);
+    setVerif(null);
+    setErro('');
+  };
+
+  const verificar = async () => {
+    if (!nome.trim() || !senha) {
+      setVerif({ tipo: 'aviso', texto: 'Preencha utilizador e senha para verificar.' });
+      return;
+    }
+    setVerificando(true);
+    const r = await onVerificar(nome, senha);
+    setVerificando(false);
+    if (r === 'ok') setVerif({ tipo: 'ok', texto: 'Senha correta. Pode clicar em Entrar.' });
+    else if (r === 'erro') setVerif({ tipo: 'aviso', texto: 'Não foi possível verificar agora. Tente novamente.' });
+    else setVerif({ tipo: 'erro', texto: 'Utilizador ou senha incorretos.' });
   };
 
   const enviar = async (e) => {
     e.preventDefault();
     setOcupado(true);
     setErro('');
-    setInfo('');
-    if (solicitando) {
-      if (senha !== confirma) {
-        setErro('As senhas não conferem.');
-        setOcupado(false);
-        return;
-      }
-      const r = await onSolicitar(nome, senha);
-      if (r) {
-        setErro(r);
-      } else {
-        setInfo('Solicitação enviada! Aguarde a aprovação do administrador para entrar.');
-        setSenha('');
-        setConfirma('');
-        setModo('entrar');
-      }
-      setOcupado(false);
-      return;
-    }
     const r = await onEntrar(nome, senha);
     if (r) {
       setErro(r);
       setOcupado(false);
     }
   };
+
+  const corVerif = { ok: 'text-emerald-400', erro: 'text-rose-400', aviso: 'text-amber-400' };
 
   return (
     <>
@@ -958,18 +854,13 @@ function TelaLogin({ onEntrar, onSolicitar, online }) {
             </div>
             <div>
               <h1 className="text-lg font-extrabold uppercase">
-                FlightOps <span className="text-sky-400">BSB</span>
+                PCAN<span className="text-sky-400">-BR</span>
               </h1>
               <p className="text-[10px] uppercase text-slate-400">Posto CAN BR — Base Aérea de Brasília</p>
             </div>
           </div>
-
-          <div className="text-xs font-bold uppercase text-sky-400">
-            {solicitando ? 'Solicitar acesso ao sistema' : 'Acesso restrito'}
-          </div>
-
-          <Campo rotulo={solicitando ? 'Seu nome (ex: 2S OLIVEIRA)' : 'Utilizador'}>
-            <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: CAIO" autoCapitalize="characters" required />
+          <Campo rotulo="Utilizador">
+            <input className={C.input} value={nome} onChange={mudarNome} placeholder="EX: CAIO" autoCapitalize="characters" required />
           </Campo>
           <Campo rotulo="Senha">
             <div className="relative">
@@ -977,7 +868,7 @@ function TelaLogin({ onEntrar, onSolicitar, online }) {
                 type={ver ? 'text' : 'password'}
                 className={`${C.input} pr-11 sem-caixa`}
                 value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+                onChange={mudarSenha}
                 placeholder="••••••••"
                 required
               />
@@ -991,34 +882,22 @@ function TelaLogin({ onEntrar, onSolicitar, online }) {
               </button>
             </div>
           </Campo>
-          {solicitando && (
-            <Campo rotulo="Confirmar senha">
-              <input
-                type={ver ? 'text' : 'password'}
-                className={`${C.input} sem-caixa`}
-                value={confirma}
-                onChange={(e) => setConfirma(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </Campo>
-          )}
+          <div className="space-y-2">
+            <button type="button" onClick={verificar} disabled={verificando} className={`${C.botaoSec} flex w-full items-center justify-center gap-2 disabled:opacity-50`}>
+              <ShieldCheck size={14} /> {verificando ? 'A verificar…' : 'Verificar senha'}
+            </button>
+            {verif && <p className={`text-xs font-bold ${corVerif[verif.tipo]}`}>{verif.texto}</p>}
+          </div>
           {erro && <p className="text-xs font-bold text-rose-400">{erro}</p>}
-          {info && <p className="text-xs font-bold text-emerald-400">{info}</p>}
           {!online && <p className="text-xs text-amber-400">A ligar ao servidor… se demorar, verifique a internet.</p>}
           <button type="submit" disabled={ocupado} className={`${C.botao} w-full`}>
-            {ocupado ? 'Aguarde…' : solicitando ? 'Enviar solicitação' : 'Entrar'}
-          </button>
-          <button
-            type="button"
-            onClick={() => trocarModo(solicitando ? 'entrar' : 'solicitar')}
-            className="w-full text-center text-[11px] font-bold uppercase text-sky-400 underline"
-          >
-            {solicitando ? 'Já tenho acesso — voltar ao login' : 'Não tenho acesso — solicitar ao administrador'}
+            {ocupado ? 'A entrar…' : 'Entrar'}
           </button>
         </form>
+        <p className="absolute bottom-4 left-0 right-0 text-center text-[11px] uppercase tracking-wide text-slate-500">
+          {NOME_APP} · Criado por <b className="text-sky-300">{CRIADOR}</b>
+        </p>
       </div>
-      <Rodape className="fixed inset-x-0 bottom-3 z-10" />
     </>
   );
 }
@@ -1047,7 +926,7 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
       return {
         aeronave: nome,
         voos: lv.length,
-        pax: lv.reduce((t, v) => t + paxDoVoo(v, f.local), 0),
+        pax: somar(lv, 'pax'),
         desemb: somar(ld, 'desembarcados'),
         pesoPax: somar(lv, 'peso_pax'),
         bagagem: somar(lv, 'peso_bagagem'),
@@ -1065,7 +944,7 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
 
   const cartoes = [
     ['Total de voos', filtrados.length, '', TEMAS.sky, 'voos'],
-    ['Total de passageiros (PAX)', filtrados.reduce((t, v) => t + paxDoVoo(v, f.local), 0), '', TEMAS.emerald, 'pax'],
+    ['Total de passageiros (PAX)', somar(filtrados, 'pax'), '', TEMAS.emerald, 'pax'],
     ['Total desembarcados', somar(filtDesemb, 'desembarcados'), '', TEMAS.cyan, 'desemb'],
     ['Peso total pax', somar(filtrados, 'peso_pax'), 'KG', TEMAS.indigo, 'pesoPax'],
     ['Peso total de bagagem', somar(filtrados, 'peso_bagagem'), 'KG', TEMAS.amber, 'bagagem'],
@@ -1177,26 +1056,9 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
   );
 }
 
-function TelaPainel({ voos, aeronaves, onEditar, onApagar, podeEditar }) {
+function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
   const filtro = useFiltro();
-  const lista = useMemo(
-    () => ordenarPorDecolagem(filtrarVoos(voos, filtro.aplicado)),
-    [voos, filtro.aplicado]
-  );
-  const localidades = useMemo(
-    () => [...new Set(voos.flatMap((v) => codigosRota(v.rota)))].filter((c) => c !== 'SBBR').sort(),
-    [voos]
-  );
-  const dias = useMemo(() => {
-    const m = new Map();
-    lista.forEach((v) => {
-      if (!m.has(v.data_voo)) m.set(v.data_voo, []);
-      m.get(v.data_voo).push(v);
-    });
-    return [...m.entries()];
-  }, [lista]);
-  const completos = lista.filter((v) => camposFaltando(v).length === 0).length;
-
+  const lista = useMemo(() => filtrarVoos(voos, filtro.aplicado), [voos, filtro.aplicado]);
   return (
     <div className="space-y-6">
       <div className={`${C.painel} space-y-4 p-5`}>
@@ -1206,50 +1068,20 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar, podeEditar }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} />
         </div>
-        <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-4 lg:grid-cols-2">
-          <Campo rotulo="Filtrar pax por localidade / destino">
-            <select
-              className={C.input}
-              value={filtro.rascunho.local}
-              onChange={(e) => filtro.setRascunho({ ...filtro.rascunho, local: e.target.value })}
-            >
-              <option value="">TODAS AS LOCALIDADES (GERAL)</option>
-              {localidades.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </Campo>
-        </div>
         <BotoesFiltro filtro={filtro} />
       </div>
-
-      <div className={`${C.painel} flex flex-wrap items-center justify-between gap-2 px-5 py-4`}>
-        <div>
-          <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
-          <p className="mt-1 text-[10px] uppercase text-slate-500">Sequência por data e hora de decolagem</p>
-        </div>
-        <div className="flex items-center gap-4 font-mono text-[11px] uppercase">
-          <span className="text-slate-400">{lista.length} registos</span>
-          <span className="text-emerald-400">{completos} completos</span>
-        </div>
+      <div className={`${C.painel} flex items-center justify-between px-5 py-4`}>
+        <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
+        <span className="font-mono text-[11px] uppercase text-slate-400">{lista.length} registos</span>
       </div>
-
       {lista.length === 0 ? (
         <p className="py-10 text-center text-xs uppercase text-slate-500">Nenhum voo encontrado.</p>
       ) : (
-        dias.map(([data, vs]) => (
-          <div key={data} className="space-y-4">
-            <div className="flex items-center gap-3 border-b border-slate-800 pb-2 text-xs font-bold uppercase text-sky-400">
-              <CalendarDays size={14} /> {fmtData(data)} — {diaSemana(data)}
-              <span className="ml-auto font-mono text-[11px] text-slate-400">{vs.length} voo(s)</span>
-            </div>
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              {vs.map((v, i) => (
-                <CartaoVoo key={v.id} v={v} ordem={i + 1} onEditar={onEditar} onApagar={onApagar} podeEditar={podeEditar} />
-              ))}
-            </div>
-          </div>
-        ))
+        <div className="space-y-3">
+          {lista.map((v) => (
+            <TiraVoo key={v.id} v={v} onEditar={onEditar} onApagar={onApagar} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1279,26 +1111,20 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
   );
   const [prev, setPrev] = useState(voo?.lista_prevista || '');
   const [real, setReal] = useState(voo?.lista_real || '');
-  const [paxDest, setPaxDest] = useState(() => {
-    const o = {};
-    (voo?.pax_destinos || []).forEach((d, i) => {
-      o[i] = String(d.pax ?? '');
-    });
-    return o;
-  });
+  const [paxDest, setPaxDest] = useState(() =>
+    Object.fromEntries(Object.entries(voo?.pax_destinos || {}).map(([k, x]) => [k, String(x)]))
+  );
   const [salvando, setSalvando] = useState(false);
+  const [alerta, setAlerta] = useState(null);
+  const pendente = useRef(null);
 
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
   const setHora = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value.replace(/[^\d:]/g, '').slice(0, 5) }));
   const fecharHora = (k) => () => setF((s) => ({ ...s, [k]: normHora(s[k]) }));
+  const mudarRota = (e) => setF((s) => ({ ...s, rota: formatarRota(e.target.value, s.rota) }));
+  const fecharRotaCampo = () => setF((s) => ({ ...s, rota: fecharRota(s.rota) }));
 
   const totalPeso = (Number(f.peso_pax) || 0) + (Number(f.peso_bagagem) || 0);
-
-  // Rota com mais de um destino (ex: SBBR-SBGR-SBGL): abre a divisão de pax por destino
-  const destinos = useMemo(() => destinosDaRota(f.rota), [f.rota]);
-  const mostraDivisao = destinos.length >= 2;
-  const somaDest = destinos.reduce((s, _, i) => s + (Number(paxDest[i]) || 0), 0);
-  const usaDivisao = mostraDivisao && destinos.some((_, i) => paxDest[i] !== undefined && paxDest[i] !== '');
   const temListas = Boolean(prev.trim() || real.trim());
   const cruz = useMemo(
     () =>
@@ -1314,186 +1140,218 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
   );
   const pctFaltas = cruz.total_previsto ? ((cruz.faltas / cruz.total_previsto) * 100).toFixed(1) : '0.0';
 
+  // PAX por destino (só quando a rota tem mais de um destino)
+  const destinos = useMemo(() => destinosDaRota(f.rota), [f.rota]);
+  const multi = destinos.length > 1;
+  const somaDest = destinos.reduce((s, c) => s + (Number(paxDest[c]) || 0), 0);
+  const paxTotal = Number(f.pax) || 0;
+  const divergente = multi && somaDest !== paxTotal;
+  const paxDestinos = multi ? Object.fromEntries(destinos.map((c) => [c, Number(paxDest[c]) || 0])) : {};
+
+  const listaPend = pendenciasVoo({
+    rota: f.rota,
+    pax: f.pax,
+    hora_chamada: normHora(f.hora_chamada),
+    hora_decolagem: normHora(f.hora_decolagem),
+    hora_real: normHora(f.hora_real),
+    peso_pax: f.peso_pax,
+    peso_bagagem: f.peso_bagagem,
+    qtd_bagagens: f.qtd_bagagens,
+    lista_prevista: prev,
+    lista_real: real,
+    pax_destinos: paxDestinos
+  });
+
+  const montarDados = () => ({
+    aeronave: f.aeronave || aeronaves[0]?.modelo,
+    matricula: f.matricula.trim().toUpperCase(),
+    rota: fecharRota(f.rota.trim().toUpperCase()),
+    data_voo: f.data_voo,
+    hora_chamada: normHora(f.hora_chamada),
+    hora_decolagem: normHora(f.hora_decolagem),
+    hora_real: normHora(f.hora_real),
+    pax: Number(f.pax) || 0,
+    peso_pax: Number(f.peso_pax) || 0,
+    peso_bagagem: Number(f.peso_bagagem) || 0,
+    total_peso: totalPeso,
+    qtd_bagagens: Number(f.qtd_bagagens) || 0,
+    lista_prevista: prev.toUpperCase(),
+    lista_real: real.toUpperCase(),
+    pax_destinos: paxDestinos,
+    ...cruz
+  });
+
+  const salvar = async (dados) => {
+    setSalvando(true);
+    await onSalvar(dados, voo?.id);
+    setSalvando(false);
+  };
+
   const enviar = async (e) => {
     e.preventDefault();
-    const aeronave = f.aeronave || aeronaves[0]?.modelo;
-    if (!aeronave) return avisar('Cadastre uma aeronave antes de adicionar voos.', 'erro');
-    const paxTotal = f.pax === '' ? (usaDivisao ? somaDest : 0) : Number(f.pax) || 0;
-    if (usaDivisao && paxTotal !== somaDest) {
-      return avisar(`A soma dos pax por destino (${somaDest}) deve ser igual ao total de PAX (${paxTotal}).`, 'erro');
+    const dados = montarDados();
+    if (!dados.aeronave) return avisar('Cadastre uma aeronave antes de adicionar voos.', 'erro');
+    if (listaPend.length > 0) {
+      pendente.current = dados;
+      setAlerta({
+        tipo: 'aviso',
+        titulo: 'Voo não está totalmente preenchido',
+        texto: 'Foram encontradas as pendências abaixo. Deseja salvar mesmo assim?',
+        itens: listaPend,
+        botao: 'Salvar mesmo assim',
+        botaoCancelar: 'Voltar e corrigir'
+      });
+      return;
     }
-    setSalvando(true);
-    await onSalvar(
-      {
-        aeronave,
-        matricula: f.matricula.trim().toUpperCase(),
-        rota: limparRota(f.rota),
-        data_voo: f.data_voo,
-        hora_chamada: normHora(f.hora_chamada),
-        hora_decolagem: normHora(f.hora_decolagem),
-        hora_real: normHora(f.hora_real),
-        pax: paxTotal,
-        pax_destinos: usaDivisao ? destinos.map((d, i) => ({ destino: d, pax: Number(paxDest[i]) || 0 })) : null,
-        peso_pax: Number(f.peso_pax) || 0,
-        peso_bagagem: Number(f.peso_bagagem) || 0,
-        total_peso: totalPeso,
-        qtd_bagagens: Number(f.qtd_bagagens) || 0,
-        lista_prevista: prev.toUpperCase(),
-        lista_real: real.toUpperCase(),
-        ...cruz
-      },
-      voo?.id
-    );
-    setSalvando(false);
+    await salvar(dados);
   };
 
   const num = (k) => ({ type: 'number', min: '0', inputMode: 'numeric', className: C.input, value: f[k], onChange: set(k), placeholder: '0' });
   const hora = (k, ph) => ({ className: C.input, value: f[k], onChange: setHora(k), onBlur: fecharHora(k), placeholder: ph, inputMode: 'numeric' });
 
   return (
-    <form onSubmit={enviar} className={`${C.painel} mx-auto max-w-4xl space-y-6 p-6`}>
-      <div className="flex items-center justify-between">
-        <div className={C.titulo}>
-          <PlusCircle size={15} /> {voo ? 'Editar voo' : 'Adicionar voo'} — Posto CAN BR
+    <>
+      <form onSubmit={enviar} className={`${C.painel} mx-auto max-w-4xl space-y-6 p-6`}>
+        <div className="flex items-center justify-between">
+          <div className={C.titulo}>
+            <PlusCircle size={15} /> {voo ? 'Editar voo' : 'Adicionar voo'} — Posto CAN BR
+          </div>
+          {voo && (
+            <button type="button" onClick={onCancelar} className="text-[11px] font-bold uppercase text-rose-400 underline">
+              Cancelar edição
+            </button>
+          )}
         </div>
-        {voo && (
-          <button type="button" onClick={onCancelar} className="text-[11px] font-bold uppercase text-rose-400 underline">
-            Cancelar edição
-          </button>
-        )}
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Campo rotulo="Tipo de aeronave FAB">
-          <select className={C.input} value={f.aeronave || aeronaves[0]?.modelo || ''} onChange={set('aeronave')}>
-            {aeronaves.map((a) => (
-              <option key={a.id} value={a.modelo}>{a.modelo}</option>
-            ))}
-          </select>
-        </Campo>
-        <Campo rotulo="Matrícula (não obrigatória)">
-          <input className={C.input} value={f.matricula} onChange={set('matricula')} placeholder="EX: FAB 2310" />
-        </Campo>
-        <Campo rotulo="Rota (digite só os códigos: SBBRSBGL)">
-          <input
-            className={C.input}
-            value={f.rota}
-            onChange={(e) => setF((s) => ({ ...s, rota: formatarRota(e.target.value, s.rota) }))}
-            onBlur={() => setF((s) => ({ ...s, rota: limparRota(s.rota) }))}
-            placeholder="SBBR-SBGL"
-            autoCapitalize="characters"
-            autoComplete="off"
-          />
-        </Campo>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Campo rotulo="Tipo de aeronave FAB">
+            <select className={C.input} value={f.aeronave || aeronaves[0]?.modelo || ''} onChange={set('aeronave')}>
+              {aeronaves.map((a) => (
+                <option key={a.id} value={a.modelo}>{a.modelo}</option>
+              ))}
+            </select>
+          </Campo>
+          <Campo rotulo="Matrícula (não obrigatória)">
+            <input className={C.input} value={f.matricula} onChange={set('matricula')} placeholder="EX: FAB 2310" />
+          </Campo>
+          <Campo rotulo="Rota (ex: SBBR-SBGR-SBGL)">
+            <input className={C.input} value={f.rota} onChange={mudarRota} onBlur={fecharRotaCampo} placeholder="SBBR-SBGR-SBGL" />
+          </Campo>
 
-        <Campo rotulo="Data do voo">
-          <input type="date" required className={C.input} value={f.data_voo} onChange={set('data_voo')} />
-        </Campo>
-        <Campo rotulo="Hora de chamada">
-          <input {...hora('hora_chamada', '1330')} />
-        </Campo>
-        <Campo rotulo="Hora de decolagem (prevista)">
-          <input {...hora('hora_decolagem', '1530')} />
-        </Campo>
+          <Campo rotulo="Data do voo">
+            <input type="date" required className={C.input} value={f.data_voo} onChange={set('data_voo')} />
+          </Campo>
+          <Campo rotulo="Hora de chamada">
+            <input {...hora('hora_chamada', '1330')} />
+          </Campo>
+          <Campo rotulo="Hora de decolagem (prevista)">
+            <input {...hora('hora_decolagem', '1530')} />
+          </Campo>
 
-        <Campo rotulo="Hora real (atendimento)">
-          <input {...hora('hora_real', '1430')} />
-        </Campo>
-        <Campo rotulo="Total de passageiros (PAX)"><input {...num('pax')} /></Campo>
-        <Campo rotulo="Peso de PAX (kg)"><input {...num('peso_pax')} /></Campo>
+          <Campo rotulo="Hora real (atendimento)">
+            <input {...hora('hora_real', '1430')} />
+          </Campo>
+          <Campo rotulo="Total de passageiros (PAX)"><input {...num('pax')} /></Campo>
+          <Campo rotulo="Peso de PAX (kg)"><input {...num('peso_pax')} /></Campo>
 
-        <Campo rotulo="Peso de bagagem (kg)"><input {...num('peso_bagagem')} /></Campo>
-        <Campo rotulo="Total de peso (auto)">
-          <div className={`${C.input} font-bold text-sky-400`}>{totalPeso} KG</div>
-        </Campo>
-        <Campo rotulo="Quantidade de bagagens"><input {...num('qtd_bagagens')} /></Campo>
-      </div>
+          <Campo rotulo="Peso de bagagem (kg)"><input {...num('peso_bagagem')} /></Campo>
+          <Campo rotulo="Total de peso (auto)">
+            <div className={`${C.input} font-bold text-sky-400`}>{totalPeso} KG</div>
+          </Campo>
+          <Campo rotulo="Quantidade de bagagens"><input {...num('qtd_bagagens')} /></Campo>
+        </div>
 
-      {mostraDivisao && (
-        <div className={`${C.caixa} space-y-3 p-4`}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-[11px] font-bold uppercase text-sky-400">
-              <MapPin size={13} /> Pax por destino — {codigosRota(f.rota).join(' → ')}
+        {multi && (
+          <div className={`${C.caixa} space-y-3 p-4`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase text-sky-400">PAX por destino</span>
+              <span className={`font-mono text-xs font-bold ${divergente ? 'text-amber-400' : 'text-emerald-400'}`}>
+                Soma dos destinos: {somaDest} · PAX total: {paxTotal}
+              </span>
             </div>
-            <span
-              className={`font-mono text-[11px] font-bold uppercase ${
-                !usaDivisao || f.pax === ''
-                  ? 'text-slate-400'
-                  : somaDest === (Number(f.pax) || 0)
-                  ? 'text-emerald-400'
-                  : 'text-amber-400'
-              }`}
-            >
-              Soma: {somaDest} / Total PAX: {f.pax === '' ? '—' : f.pax}
-            </span>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {destinos.map((c) => (
+                <Campo key={c} rotulo={c}>
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    className={C.input}
+                    value={paxDest[c] ?? ''}
+                    onChange={(e) => setPaxDest((s) => ({ ...s, [c]: e.target.value }))}
+                    placeholder="0"
+                  />
+                </Campo>
+              ))}
+            </div>
+            {divergente && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-700 bg-amber-950/30 px-3 py-2 text-xs text-amber-300">
+                <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                <span>
+                  ALERTA: a soma dos PAX por destino ({somaDest}) é diferente do PAX total ({paxTotal}).
+                </span>
+              </div>
+            )}
           </div>
-          <p className="text-[10px] text-slate-500">
-            Esta rota tem mais de um destino: informe quantos passageiros vão para cada um. Se deixar o Total de PAX em
-            branco, ele será a soma. Deixe tudo em branco para não dividir.
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {destinos.map((d, i) => (
-              <Campo key={i} rotulo={`${i + 1}º destino — ${d}`}>
-                <input
-                  type="number"
-                  min="0"
-                  inputMode="numeric"
-                  className={C.input}
-                  value={paxDest[i] ?? ''}
-                  onChange={(e) => setPaxDest((st) => ({ ...st, [i]: e.target.value }))}
-                  placeholder="0"
-                />
-              </Campo>
-            ))}
+        )}
+
+        <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-5 md:grid-cols-2">
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase text-sky-400">
+              <FileText size={13} /> 1. Copiar & colar relação principal
+            </div>
+            <p className="mb-2 text-[10px] text-slate-500">Patentes (2S, SGT, CEL) são ignoradas no cruzamento de nomes</p>
+            <textarea rows="5" className={C.input} value={prev} onChange={(e) => setPrev(e.target.value)} placeholder={'2S JOAO DA SILVA\nSGT MARIA OLIVEIRA\nCEL CARLOS SOUZA'} />
+            <p className={`mt-1 text-[10px] ${contarNomes(prev) === 0 ? 'text-amber-400' : 'text-slate-500'}`}>{contarNomes(prev)} nomes</p>
+          </div>
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase text-emerald-400">
+              <Users size={13} /> 2. Copiar & colar efetivamente embarcados
+            </div>
+            <p className="mb-2 text-[10px] text-slate-500">O nome limpo coincidirá mesmo se omitir a patente nesta lista</p>
+            <textarea rows="5" className={C.input} value={real} onChange={(e) => setReal(e.target.value)} placeholder={'JOAO DA SILVA\nMARIA OLIVEIRA\nNOVO PASSAGEIRO'} />
+            <p className={`mt-1 text-[10px] ${contarNomes(real) === 0 ? 'text-amber-400' : 'text-slate-500'}`}>{contarNomes(real)} nomes</p>
           </div>
         </div>
-      )}
 
-      <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-5 md:grid-cols-2">
-        <div>
-          <div className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase text-sky-400">
-            <FileText size={13} /> 1. Copiar & colar relação principal
-          </div>
-          <p className="mb-2 text-[10px] text-slate-500">Patentes (2S, SGT, CEL) são ignoradas no cruzamento de nomes</p>
-          <textarea rows="5" className={C.input} value={prev} onChange={(e) => setPrev(e.target.value)} placeholder={'2S JOAO DA SILVA\nSGT MARIA OLIVEIRA\nCEL CARLOS SOUZA'} />
+        <div className={`${C.caixa} grid grid-cols-2 gap-4 p-4 text-center sm:grid-cols-5`}>
+          {[
+            ['Total previsto', cruz.total_previsto, 'text-white'],
+            ['Embarcados', cruz.embarcados, 'text-sky-400'],
+            ['Faltas', cruz.faltas, 'text-amber-400'],
+            ['Extras (+)', cruz.extras, 'text-emerald-400'],
+            ['% Faltas', `${pctFaltas}%`, 'text-rose-400']
+          ].map(([r, v, cor]) => (
+            <div key={r}>
+              <div className="text-[10px] uppercase text-slate-500">{r}</div>
+              <div className={`font-mono text-lg font-bold ${cor}`}>{v}</div>
+            </div>
+          ))}
         </div>
-        <div>
-          <div className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase text-emerald-400">
-            <Users size={13} /> 2. Copiar & colar efetivamente embarcados
-          </div>
-          <p className="mb-2 text-[10px] text-slate-500">O nome limpo coincidirá mesmo se omitir a patente nesta lista</p>
-          <textarea rows="5" className={C.input} value={real} onChange={(e) => setReal(e.target.value)} placeholder={'JOAO DA SILVA\nMARIA OLIVEIRA\nNOVO PASSAGEIRO'} />
-        </div>
-      </div>
+        {voo && !temListas && (
+          <p className="text-[10px] text-slate-500">Os números acima são os já guardados. Cole as listas novamente apenas se quiser recalcular.</p>
+        )}
 
-      <div className={`${C.caixa} grid grid-cols-2 gap-4 p-4 text-center sm:grid-cols-5`}>
-        {[
-          ['Total previsto', cruz.total_previsto, 'text-white'],
-          ['Embarcados', cruz.embarcados, 'text-sky-400'],
-          ['Faltas', cruz.faltas, 'text-amber-400'],
-          ['Extras (+)', cruz.extras, 'text-emerald-400'],
-          ['% Faltas', `${pctFaltas}%`, 'text-rose-400']
-        ].map(([r, v, cor]) => (
-          <div key={r}>
-            <div className="text-[10px] uppercase text-slate-500">{r}</div>
-            <div className={`font-mono text-lg font-bold ${cor}`}>{v}</div>
-          </div>
-        ))}
-      </div>
-      {voo && !temListas && (
-        <p className="text-[10px] text-slate-500">Os números acima são os já guardados. Cole as listas novamente apenas se quiser recalcular.</p>
-      )}
+        <button type="submit" disabled={salvando} className={`${C.botao} w-full py-4`}>
+          {salvando ? 'A guardar…' : voo ? 'Salvar alterações do voo' : 'Salvar voo e gerar relatório do Posto CAN BR'}
+        </button>
+      </form>
 
-      <button type="submit" disabled={salvando} className={`${C.botao} w-full py-4`}>
-        {salvando ? 'A guardar…' : voo ? 'Salvar alterações do voo' : 'Salvar voo e gerar relatório do Posto CAN BR'}
-      </button>
-    </form>
+      <Modal
+        dados={alerta}
+        onCancelar={() => setAlerta(null)}
+        onConfirmar={async () => {
+          setAlerta(null);
+          await salvar(pendente.current);
+        }}
+      />
+    </>
   );
 }
 
 const NOVO_DESEMB = () => ({ aeronave: '', matricula: '', rota: '', data_voo: hoje(), desembarcados: '' });
 
-function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, podeEditar }) {
+function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }) {
   const filtro = useFiltro();
   const [f, setF] = useState(NOVO_DESEMB);
   const [editando, setEditando] = useState(null);
@@ -1503,6 +1361,8 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, 
   const lista = useMemo(() => filtrarVoos(desembarques, filtro.aplicado), [desembarques, filtro.aplicado]);
   const total = somar(lista, 'desembarcados');
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const mudarRota = (e) => setF((s) => ({ ...s, rota: formatarRota(e.target.value, s.rota) }));
+  const fecharRotaCampo = () => setF((s) => ({ ...s, rota: fecharRota(s.rota) }));
 
   const editar = (d) => {
     setEditando(d);
@@ -1533,7 +1393,7 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, 
       {
         aeronave,
         matricula: f.matricula.trim().toUpperCase(),
-        rota: limparRota(f.rota),
+        rota: fecharRota(f.rota.trim().toUpperCase()),
         data_voo: f.data_voo,
         desembarcados: Math.floor(qtd)
       },
@@ -1545,7 +1405,6 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, 
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      {podeEditar && (
       <form ref={formRef} onSubmit={enviar} className={`${C.painel} space-y-4 p-5`}>
         <div className="flex items-center justify-between">
           <div className={C.titulo}>
@@ -1576,15 +1435,7 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, 
             <input className={C.input} value={f.matricula} onChange={set('matricula')} placeholder="EX: FAB 2310" />
           </Campo>
           <Campo rotulo="Rota / origem (opcional)">
-            <input
-              className={C.input}
-              value={f.rota}
-              onChange={(e) => setF((s) => ({ ...s, rota: formatarRota(e.target.value, s.rota) }))}
-              onBlur={() => setF((s) => ({ ...s, rota: limparRota(s.rota) }))}
-              placeholder="SBGR-SBBR"
-              autoCapitalize="characters"
-              autoComplete="off"
-            />
+            <input className={C.input} value={f.rota} onChange={mudarRota} onBlur={fecharRotaCampo} placeholder="SBGR-SBBR" />
           </Campo>
           <Campo rotulo="Qtd desembarcados">
             <input
@@ -1603,7 +1454,6 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, 
           {salvando ? 'A guardar…' : editando ? 'Salvar alterações do desembarque' : 'Incluir voo de desembarque'}
         </button>
       </form>
-      )}
 
       <div className={`${C.painel} space-y-4 p-5`}>
         <div className={C.titulo}>
@@ -1632,14 +1482,11 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, 
           {lista.map((d) => (
             <div key={d.id} className={`${C.painel} space-y-3 p-5`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <IconeAeronave modelo={d.aeronave} className="w-16" />
-                  <div>
-                    <h3 className="text-sm font-bold uppercase text-sky-400">{d.aeronave}</h3>
-                    <p className="mt-1 text-[11px] uppercase text-slate-400">
-                      Matrícula: <b className="font-mono text-white">{d.matricula || 'N/D'}</b>
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-sm font-bold uppercase text-sky-400">{d.aeronave}</h3>
+                  <p className="mt-1 text-[11px] uppercase text-slate-400">
+                    Matrícula: <b className="font-mono text-white">{d.matricula || 'N/D'}</b>
+                  </p>
                 </div>
                 <div className="text-right">
                   <span className="inline-block rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">
@@ -1657,16 +1504,14 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar, 
                   Última alt. por: <b className="font-mono text-white">{d.ultima_alt_por || '—'}</b>{' '}
                   <span className="font-mono text-sky-300">({fmtTs(d.ultima_alt_em)})</span>
                 </span>
-                {podeEditar && (
-                  <div className="flex items-center gap-4 text-[11px] font-bold uppercase">
-                    <button onClick={() => editar(d)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
-                      <Pencil size={13} /> Editar
-                    </button>
-                    <button onClick={() => onApagar(d)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
-                      <Trash2 size={13} /> Apagar
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-4 text-[11px] font-bold uppercase">
+                  <button onClick={() => editar(d)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
+                    <Pencil size={13} /> Editar
+                  </button>
+                  <button onClick={() => onApagar(d)} className="flex items-center gap-1 text-rose-400 hover:text-rose-300">
+                    <Trash2 size={13} /> Apagar
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -1699,10 +1544,7 @@ function TelaAeronaves({ aeronaves, onAdicionar, onRemover }) {
         <h3 className="text-xs font-bold uppercase text-white">Aeronaves registradas:</h3>
         {aeronaves.map((a) => (
           <div key={a.id} className={`${C.caixa} flex items-center justify-between px-3 py-3`}>
-            <span className="flex items-center gap-3 font-mono text-xs font-bold uppercase text-sky-300">
-              <IconeAeronave modelo={a.modelo} className="w-16" />
-              {a.modelo}
-            </span>
+            <span className="font-mono text-xs font-bold uppercase text-sky-300">{a.modelo}</span>
             <div className="flex items-center gap-3">
               <ShieldCheck size={15} className="text-emerald-400" />
               <button onClick={() => onRemover(a)} className="text-rose-400 hover:text-rose-300" title="Remover">
@@ -1755,14 +1597,7 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
                   {v.aeronave}{v.matricula ? ` (${v.matricula})` : ''}
                 </td>
                 <td className="px-3 py-3 font-mono">{v.rota}</td>
-                <td className="px-3 py-3 font-mono font-bold">
-                  {v.pax}
-                  {Array.isArray(v.pax_destinos) && v.pax_destinos.length > 0 && (
-                    <div className="text-[9px] font-normal text-slate-500">
-                      {v.pax_destinos.map((d) => `${d.destino}: ${d.pax}`).join(' · ')}
-                    </div>
-                  )}
-                </td>
+                <td className="px-3 py-3 font-mono font-bold">{v.pax}</td>
                 <td className="px-3 py-3 font-mono font-bold">{v.total_peso} KG</td>
                 <td className="px-3 py-3 font-mono font-bold text-emerald-700">
                   {fmtEf(calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real))}
@@ -1820,7 +1655,7 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
           <div className="mb-1 w-64 border-b border-slate-900" />
           <b>Chefe do Posto CAN BR (SBBR)</b>
         </div>
-        <span className="text-slate-500">Sistema FlightOps BSB — Controlo operacional</span>
+        <span className="text-slate-500">Sistema PCAN-BR — Controlo operacional</span>
       </div>
     </div>
   );
@@ -1853,19 +1688,13 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
   );
 }
 
-const OPCOES_PERFIL = [
-  ['admin', 'ADMINISTRADOR'],
-  ['operador', 'OPERADOR'],
-  ['observador', 'OBSERVADOR (SÓ VISUALIZA)']
-];
-
-function TelaUsuarios({ usuario, usuarios, pendentes, onSenha, onCriar, onRemover, onAprovar, onRecusar, onPerfil }) {
+function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover, onResetar }) {
   const [novaSenha, setNovaSenha] = useState('');
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [perfil, setPerfil] = useState('operador');
-  const [escolhas, setEscolhas] = useState({});
-  const aprovados = usuarios.filter((u) => u.aprovado !== false);
+  const [resetId, setResetId] = useState(null);
+  const [senhaReset, setSenhaReset] = useState('');
 
   const trocar = async () => {
     if (await onSenha(novaSenha)) setNovaSenha('');
@@ -1878,63 +1707,37 @@ function TelaUsuarios({ usuario, usuarios, pendentes, onSenha, onCriar, onRemove
       setPerfil('operador');
     }
   };
+  const gerarTemp = () => {
+    const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    const bytes = crypto.getRandomValues(new Uint32Array(8));
+    setSenhaReset(Array.from(bytes, (n) => alfabeto[n % alfabeto.length]).join(''));
+  };
+  const abrirReset = (u) => {
+    setResetId((atual) => (atual === u.id ? null : u.id));
+    setSenhaReset('');
+  };
+  const salvarReset = async (u) => {
+    if (await onResetar(u, senhaReset)) {
+      setResetId(null);
+      setSenhaReset('');
+    }
+  };
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      {pendentes.length > 0 && (
-        <div className={`${C.painel} space-y-3 border-amber-700/60 p-6`}>
-          <div className="flex items-center gap-2 text-xs font-bold uppercase text-amber-400">
-            <AlertTriangle size={15} /> Solicitações de acesso pendentes ({pendentes.length})
-          </div>
-          {pendentes.map((u) => (
-            <div key={u.id} className={`${C.caixa} space-y-3 p-3`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</span>
-                <span className="font-mono text-[10px] text-slate-500">{fmtTs(u.criado_em)}</span>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className={`${C.input} min-w-[160px] flex-1`}
-                  value={escolhas[u.id] || 'observador'}
-                  onChange={(e) => setEscolhas((s) => ({ ...s, [u.id]: e.target.value }))}
-                >
-                  {OPCOES_PERFIL.map(([v, r]) => (
-                    <option key={v} value={v}>{r}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => onAprovar(u, escolhas[u.id] || 'observador')}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-xs font-bold uppercase text-white hover:bg-emerald-500"
-                >
-                  Aprovar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRecusar(u)}
-                  className="rounded-xl border border-rose-800 px-4 py-3 text-xs font-bold uppercase text-rose-400 hover:bg-rose-950/40"
-                >
-                  Recusar
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className={`${C.painel} space-y-4 p-6`}>
         <div className={C.titulo}>
-          <KeyRound size={15} /> Segurança e senha de {usuario.nome}
+          <KeyRound size={15} /> Segurança e senha do administrador {usuario.nome}
         </div>
-        <Campo rotulo={`Nova senha para ${usuario.nome}`}>
+        <Campo rotulo={`Nova senha para o administrador ${usuario.nome}`}>
           <input type="password" className={C.input} value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} placeholder="DIGITE A NOVA SENHA" />
         </Campo>
-        <button onClick={trocar} className={`${C.botao} w-full`}>Atualizar senha</button>
+        <button onClick={trocar} className={`${C.botao} w-full`}>Atualizar senha do administrador</button>
       </div>
 
       <form onSubmit={criar} className={`${C.painel} space-y-4 p-6`}>
         <div className="flex items-center gap-2 text-xs font-bold uppercase text-emerald-400">
-          <UserPlus size={15} /> Cadastrar novo utilizador
+          <UserPlus size={15} /> Cadastrar novo utilizador / operador
         </div>
         <Campo rotulo="Nome do utilizador">
           <input className={C.input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="EX: 2S OLIVEIRA" required />
@@ -1942,46 +1745,63 @@ function TelaUsuarios({ usuario, usuarios, pendentes, onSenha, onCriar, onRemove
         <Campo rotulo="Senha de acesso">
           <input type="password" className={C.input} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="MÍNIMO 6 CARACTERES" required />
         </Campo>
-        <Campo rotulo="Perfil de acesso">
+        <Campo rotulo="Perfil (operador ou administrador)">
           <select className={C.input} value={perfil} onChange={(e) => setPerfil(e.target.value)}>
-            {OPCOES_PERFIL.map(([v, r]) => (
-              <option key={v} value={v}>{r}</option>
-            ))}
+            <option value="operador">OPERADOR</option>
+            <option value="admin">ADMINISTRADOR</option>
           </select>
         </Campo>
-        <div className={`${C.caixa} space-y-1 p-3 text-[10px] leading-relaxed text-slate-400`}>
-          <p><b className="text-sky-300">ADMINISTRADOR:</b> acesso total, aprova utilizadores, lixeira e perfis.</p>
-          <p><b className="text-emerald-300">OPERADOR:</b> cadastra, edita e exclui voos, desembarques e aeronaves.</p>
-          <p><b className="text-amber-300">OBSERVADOR:</b> apenas visualiza o app (sem cadastrar, editar ou excluir).</p>
-        </div>
         <button type="submit" className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-bold uppercase text-white hover:bg-emerald-500">
           Cadastrar utilizador
         </button>
       </form>
 
-      <div className={`${C.painel} space-y-2 p-6`}>
-        <h3 className="text-xs font-bold uppercase text-white">Utilizadores cadastrados ({aprovados.length}):</h3>
-        {aprovados.map((u) => (
-          <div key={u.id} className={`${C.caixa} flex flex-wrap items-center justify-between gap-2 px-3 py-3`}>
-            <span className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</span>
-            {u.id === usuario.id ? (
-              <span className="rounded border border-sky-800 bg-sky-950/50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300">
-                {PERFIS[u.perfil] || u.perfil} (você)
-              </span>
-            ) : (
+      <div className={`${C.painel} space-y-3 p-6`}>
+        <h3 className="text-xs font-bold uppercase text-white">Utilizadores com acesso ao sistema ({usuarios.length})</h3>
+        {usuarios.map((u) => (
+          <div key={u.id} className={`${C.caixa} px-3 py-3`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</div>
+                <div className="mt-0.5 text-[11px] uppercase text-slate-400">
+                  Último acesso:{' '}
+                  <span className="font-mono text-white">{u.ultimo_acesso ? fmtTs(u.ultimo_acesso) : 'nunca acessou'}</span>
+                </div>
+              </div>
               <div className="flex items-center gap-3">
-                <select
-                  className="rounded-lg border border-slate-700 bg-[#0c1424] px-2 py-1.5 font-mono text-[10px] uppercase text-slate-200 [color-scheme:dark]"
-                  value={u.perfil}
-                  onChange={(e) => onPerfil(u, e.target.value)}
+                <span className="rounded border border-sky-800 bg-sky-950/50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase text-sky-300">
+                  {u.perfil === 'admin' ? 'Admin' : 'Operador'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => abrirReset(u)}
+                  className="flex items-center gap-1 text-[11px] font-bold uppercase text-amber-400 hover:text-amber-300"
                 >
-                  {OPCOES_PERFIL.map(([v, r]) => (
-                    <option key={v} value={v}>{r}</option>
-                  ))}
-                </select>
-                <button type="button" onClick={() => onRemover(u)} className="text-rose-400 hover:text-rose-300" title="Remover acesso">
-                  <Trash2 size={15} />
+                  <KeyRound size={13} /> Redefinir senha
                 </button>
+                {u.id !== usuario.id && (
+                  <button type="button" onClick={() => onRemover(u)} className="text-rose-400 hover:text-rose-300" title="Remover">
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+            {resetId === u.id && (
+              <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+                <div className="text-[11px] uppercase text-slate-400">Nova senha para {u.nome} (mínimo 6 caracteres)</div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    className={`${C.input} sem-caixa min-w-[160px] flex-1`}
+                    value={senhaReset}
+                    onChange={(e) => setSenhaReset(e.target.value)}
+                    placeholder="Digite ou gere uma senha"
+                  />
+                  <button type="button" onClick={gerarTemp} className={C.botaoSec}>Gerar senha</button>
+                  <button type="button" onClick={() => salvarReset(u)} className={C.botao}>Salvar</button>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  Anote e repasse a nova senha ao utilizador. Depois de salvar ela não poderá ser consultada novamente.
+                </p>
               </div>
             )}
           </div>
@@ -2007,14 +1827,11 @@ function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
           {voos.map((v) => (
             <div key={v.id} className={`${C.painel} space-y-4 p-5`}>
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <IconeAeronave modelo={v.aeronave} className="w-16" />
-                  <div>
-                    <h3 className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</h3>
-                    <p className="mt-1 text-[11px] uppercase text-slate-400">
-                      Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</h3>
+                  <p className="mt-1 text-[11px] uppercase text-slate-400">
+                    Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
+                  </p>
                 </div>
                 <div className="text-right">
                   <span className="rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">{v.rota || '—'}</span>
@@ -2046,16 +1863,101 @@ function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
   );
 }
 
+function TelaHistorico({ historico }) {
+  const [tabela, setTabela] = useState('');
+  const [autor, setAutor] = useState('');
+  const autores = useMemo(() => [...new Set(historico.map((h) => h.usuario))].sort(), [historico]);
+  const lista = useMemo(
+    () => historico.filter((h) => (!tabela || h.tabela === tabela) && (!autor || h.usuario === autor)),
+    [historico, tabela, autor]
+  );
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className={`${C.painel} space-y-4 p-5`}>
+        <div className={C.titulo}>
+          <Clock size={15} /> Histórico de alterações — quem alterou, quando e o quê
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Campo rotulo="Tipo de registo">
+            <select className={C.input} value={tabela} onChange={(e) => setTabela(e.target.value)}>
+              <option value="">TODOS</option>
+              <option value="voos">VOOS</option>
+              <option value="desembarques">DESEMBARQUES</option>
+              <option value="aeronaves">AERONAVES</option>
+              <option value="usuarios">UTILIZADORES</option>
+            </select>
+          </Campo>
+          <Campo rotulo="Feito por">
+            <select className={C.input} value={autor} onChange={(e) => setAutor(e.target.value)}>
+              <option value="">TODOS</option>
+              {autores.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </Campo>
+        </div>
+        <p className="text-[11px] text-slate-500">Mostra as últimas 300 alterações registadas.</p>
+      </div>
+
+      {lista.length === 0 ? (
+        <p className="py-10 text-center text-xs uppercase text-slate-500">Nenhuma alteração registada.</p>
+      ) : (
+        <div className="space-y-3">
+          {lista.map((h) => {
+            const alts = Array.isArray(h.alteracoes) ? h.alteracoes : [];
+            return (
+              <div key={h.id} className={`${C.painel} space-y-2 px-5 py-4`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${COR_ACAO[h.acao] || 'border-slate-600 text-slate-300'}`}>
+                      {h.acao}
+                    </span>
+                    <span className="text-xs font-bold uppercase text-sky-300">{ROTULO_TABELA[h.tabela] || h.tabela}</span>
+                    <span className="text-xs uppercase text-white">{h.resumo}</span>
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-400">
+                    {fmtTs(h.criado_em)} · <b className="text-white">{h.usuario}</b>
+                  </span>
+                </div>
+                {alts.length > 0 && (
+                  <ul className="space-y-1 border-t border-slate-800 pt-2 text-xs">
+                    {alts.map((d) => (
+                      <li key={d.campo} className="flex flex-wrap items-center gap-x-2 text-slate-300">
+                        <b className="uppercase text-slate-400">{d.campo}:</b>
+                        {d.texto ? (
+                          <span>{d.texto}</span>
+                        ) : (
+                          <>
+                            <span className="font-mono text-rose-300 line-through">{d.de}</span>
+                            <span>→</span>
+                            <span className="font-mono text-emerald-300">{d.para}</span>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ================================================================
    APLICATIVO PRINCIPAL
    ================================================================ */
 const MENU = [
   { id: 'dashboard', rotulo: 'Dashboard', Icone: BarChart3 },
   { id: 'voos', rotulo: 'Painel de Voos', Icone: Database },
-  { id: 'adicionar', rotulo: 'Adicionar Voo', Icone: PlusCircle, edita: true },
+  { id: 'adicionar', rotulo: 'Adicionar Voo', Icone: PlusCircle },
   { id: 'desembarque', rotulo: 'Desembarque', Icone: UserCheck },
-  { id: 'aeronaves', rotulo: 'Adicionar Aeronave', Icone: Plane, edita: true },
+  { id: 'aeronaves', rotulo: 'Adicionar Aeronave', Icone: Plane },
   { id: 'relatorio', rotulo: 'Imprimir Relatório', Icone: Printer },
+  { id: 'historico', rotulo: 'Histórico', Icone: Clock },
   { id: 'usuarios', rotulo: 'Utilizadores', Icone: Users, admin: true },
   { id: 'lixeira', rotulo: 'Lixeira', Icone: Trash2, admin: true }
 ];
@@ -2068,6 +1970,7 @@ export default function App() {
   const [desembarques, setDesembarques] = useState([]);
   const [aeronaves, setAeronaves] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
+  const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [online, setOnline] = useState(false);
   const [vooEditando, setVooEditando] = useState(null);
@@ -2075,6 +1978,7 @@ export default function App() {
   const [confirmacao, setConfirmacao] = useState(null);
   const timerAviso = useRef(null);
   const bootstrapFeito = useRef(false);
+  const acessoRegistrado = useRef(false);
 
   const avisar = useCallback((texto, tipo = 'ok') => {
     setAviso({ texto, tipo });
@@ -2086,13 +1990,14 @@ export default function App() {
   const carregarTudo = useCallback(async () => {
     if (!supabase) return;
     try {
-      const [v, d, a, u] = await Promise.all([
+      const [v, d, a, u, h] = await Promise.all([
         supabase.from('voos').select('*').order('data_voo', { ascending: false }).order('criado_em', { ascending: false }),
         supabase.from('desembarques').select('*').order('data_voo', { ascending: false }).order('criado_em', { ascending: false }),
         supabase.from('aeronaves').select('*').order('modelo'),
-        supabase.from('usuarios').select('id,nome,perfil,aprovado,criado_em').order('nome')
+        supabase.from('usuarios').select('id,nome,perfil,criado_em,ultimo_acesso').order('nome'),
+        supabase.from('historico').select('*').order('criado_em', { ascending: false }).limit(300)
       ]);
-      if (v.error || d.error || a.error || u.error) {
+      if (v.error || d.error || a.error || u.error || h.error) {
         setOnline(false);
         return;
       }
@@ -2100,6 +2005,7 @@ export default function App() {
       setDesembarques(d.data);
       setAeronaves(a.data);
       setUsuarios(u.data);
+      setHistorico(h.data);
       setOnline(true);
       setCarregando(false);
     } catch {
@@ -2116,6 +2022,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'desembarques' }, carregarTudo)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'aeronaves' }, carregarTudo)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'usuarios' }, carregarTudo)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'historico' }, carregarTudo)
       .subscribe();
     const aoVoltar = () => {
       if (document.visibilityState === 'visible') carregarTudo();
@@ -2142,65 +2049,94 @@ export default function App() {
     })();
   }, [carregando, usuarios.length, carregarTudo]);
 
+  /* ---------- regista o último acesso de quem entra no sistema ---------- */
+  useEffect(() => {
+    if (!supabase || !usuario || acessoRegistrado.current) return;
+    acessoRegistrado.current = true;
+    supabase
+      .from('usuarios')
+      .update({ ultimo_acesso: new Date().toISOString() })
+      .eq('id', usuario.id)
+      .then(() => {});
+  }, [usuario]);
+
   const sair = useCallback(() => {
     setUsuario(null);
     gravarLocal('flightops_sessao', null);
     setAba('dashboard');
+    acessoRegistrado.current = false;
   }, []);
 
   // Se o utilizador logado foi removido, encerra a sessão
   useEffect(() => {
-    if (usuario && !carregando && usuarios.length > 0 && !usuarios.some((u) => u.id === usuario.id && u.aprovado !== false)) sair();
+    if (usuario && !carregando && usuarios.length > 0 && !usuarios.some((u) => u.id === usuario.id)) sair();
   }, [usuario, usuarios, carregando, sair]);
 
   const ativos = useMemo(() => voos.filter((v) => !v.excluido), [voos]);
   const lixeira = useMemo(() => voos.filter((v) => v.excluido), [voos]);
-  // O perfil vem sempre do banco (se o admin mudar, vale na hora)
-  const eu = usuarios.find((u) => u.id === usuario?.id);
-  const perfil = eu?.perfil || usuario?.perfil;
-  const ehAdmin = perfil === 'admin';
-  const podeEditar = perfil === 'admin' || perfil === 'operador';
-  const pendentes = usuarios.filter((u) => u.aprovado === false);
+  const ehAdmin = usuario?.perfil === 'admin';
+  const ultima = historico[0];
 
   /* ---------- ações ---------- */
-  const gravar = async (consulta, msgOk) => {
-    if (!podeEditar) {
-      avisar('Seu perfil (Observador) permite apenas visualizar.', 'erro');
-      return false;
-    }
-    const { error } = await consulta;
+  // "log" (opcional) grava a alteração na aba Histórico
+  const gravar = async (consulta, msgOk, log) => {
+    const { data, error } = await consulta;
     if (error) {
       avisar(error.code === '23505' ? 'Já existe um registo com esse nome.' : `Erro: ${error.message}`, 'erro');
       return false;
+    }
+    if (log) {
+      const l = typeof log === 'function' ? log(data) : log;
+      await supabase.from('historico').insert({ usuario: usuario.nome, ...l });
     }
     if (msgOk) avisar(msgOk);
     await carregarTudo();
     return true;
   };
-  const carimbo = () => ({ ultima_alt_por: usuario.nome, ultima_alt_em: new Date().toISOString() });
+  const agora = () => new Date().toISOString();
+  const carimbo = () => ({ ultima_alt_por: usuario.nome, ultima_alt_em: agora() });
 
   const entrar = async (nome, senha) => {
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id,nome,perfil,senha_hash,aprovado')
+      .select('id,nome,perfil,senha_hash')
       .eq('nome', nome.trim().toUpperCase())
       .maybeSingle();
     if (error) return 'Falha de ligação ao servidor. Tente novamente.';
     if (!data) return 'Utilizador ou senha inválidos.';
     if ((await hashSenha(nome, senha)) !== data.senha_hash) return 'Utilizador ou senha inválidos.';
-    if (data.aprovado === false) return 'Seu acesso ainda aguarda a aprovação do administrador.';
     const sessao = { id: data.id, nome: data.nome, perfil: data.perfil };
     setUsuario(sessao);
     gravarLocal('flightops_sessao', sessao);
     return null;
   };
 
+  // Confere utilizador e senha sem entrar no sistema
+  const verificarSenha = async (nome, senha) => {
+    const { data, error } = await supabase
+      .from('usuarios')
+      .select('senha_hash')
+      .eq('nome', nome.trim().toUpperCase())
+      .maybeSingle();
+    if (error) return 'erro';
+    if (!data) return 'invalida';
+    return (await hashSenha(nome, senha)) === data.senha_hash ? 'ok' : 'invalida';
+  };
+
   const salvarVoo = async (dados, id) => {
     const payload = { ...dados, ...carimbo() };
-    const ok = await gravar(
-      id ? supabase.from('voos').update(payload).eq('id', id) : supabase.from('voos').insert(payload),
-      id ? 'Voo atualizado.' : 'Voo guardado.'
-    );
+    let ok;
+    if (id) {
+      const antes = voos.find((v) => v.id === id);
+      const depois = { ...antes, ...payload };
+      ok = await gravar(supabase.from('voos').update(payload).eq('id', id), 'Voo atualizado.', {
+        acao: 'alterou', tabela: 'voos', registro_id: id, resumo: resumoVoo(depois), alteracoes: diferencas(antes, depois)
+      });
+    } else {
+      ok = await gravar(supabase.from('voos').insert(payload).select().single(), 'Voo guardado.', (row) => ({
+        acao: 'incluiu', tabela: 'voos', registro_id: row.id, resumo: resumoVoo(row)
+      }));
+    }
     if (ok) {
       setVooEditando(null);
       setAba('voos');
@@ -2214,15 +2150,17 @@ export default function App() {
       botao: 'Sim, excluir',
       aoConfirmar: () =>
         gravar(
-          supabase.from('voos').update({ excluido: true, excluido_em: new Date().toISOString(), excluido_por: usuario.nome }).eq('id', v.id),
-          'Voo movido para a Lixeira.'
+          supabase.from('voos').update({ excluido: true, excluido_em: agora(), excluido_por: usuario.nome }).eq('id', v.id),
+          'Voo movido para a Lixeira.',
+          { acao: 'excluiu', tabela: 'voos', registro_id: v.id, resumo: `${resumoVoo(v)} → movido para a lixeira` }
         )
     });
 
   const restaurarVoo = (v) =>
     gravar(
       supabase.from('voos').update({ excluido: false, excluido_em: null, excluido_por: null, ...carimbo() }).eq('id', v.id),
-      'Voo restaurado.'
+      'Voo restaurado.',
+      { acao: 'restaurou', tabela: 'voos', registro_id: v.id, resumo: `${resumoVoo(v)} → restaurado da lixeira` }
     );
 
   const pedirExclusaoDefinitiva = (v) =>
@@ -2230,15 +2168,24 @@ export default function App() {
       titulo: 'Excluir definitivamente?',
       texto: `O voo ${v.aeronave} de ${fmtData(v.data_voo)} será apagado para sempre. Esta ação não pode ser desfeita.`,
       botao: 'Excluir definitivamente',
-      aoConfirmar: () => gravar(supabase.from('voos').delete().eq('id', v.id), 'Voo excluído definitivamente.')
+      aoConfirmar: () =>
+        gravar(supabase.from('voos').delete().eq('id', v.id), 'Voo excluído definitivamente.', {
+          acao: 'excluiu', tabela: 'voos', registro_id: v.id, resumo: `${resumoVoo(v)} → excluído definitivamente`
+        })
     });
 
   const salvarDesemb = (dados, id) => {
     const payload = { ...dados, ...carimbo() };
-    return gravar(
-      id ? supabase.from('desembarques').update(payload).eq('id', id) : supabase.from('desembarques').insert(payload),
-      id ? 'Desembarque atualizado.' : 'Voo de desembarque incluído.'
-    );
+    if (id) {
+      const antes = desembarques.find((d) => d.id === id);
+      const depois = { ...antes, ...payload };
+      return gravar(supabase.from('desembarques').update(payload).eq('id', id), 'Desembarque atualizado.', {
+        acao: 'alterou', tabela: 'desembarques', registro_id: id, resumo: resumoDesemb(depois), alteracoes: diferencas(antes, depois)
+      });
+    }
+    return gravar(supabase.from('desembarques').insert(payload).select().single(), 'Voo de desembarque incluído.', (row) => ({
+      acao: 'incluiu', tabela: 'desembarques', registro_id: row.id, resumo: resumoDesemb(row)
+    }));
   };
 
   const pedirExclusaoDesemb = (d) =>
@@ -2246,16 +2193,25 @@ export default function App() {
       titulo: 'Excluir desembarque?',
       texto: `Excluir o registo de ${d.desembarcados} desembarcados do voo ${d.aeronave} de ${fmtData(d.data_voo)}? Esta ação não pode ser desfeita.`,
       botao: 'Sim, excluir',
-      aoConfirmar: () => gravar(supabase.from('desembarques').delete().eq('id', d.id), 'Registo excluído.')
+      aoConfirmar: () =>
+        gravar(supabase.from('desembarques').delete().eq('id', d.id), 'Registo excluído.', {
+          acao: 'excluiu', tabela: 'desembarques', registro_id: d.id, resumo: resumoDesemb(d)
+        })
     });
 
-  const adicionarAeronave = (modelo) => gravar(supabase.from('aeronaves').insert({ modelo }), 'Aeronave adicionada.');
+  const adicionarAeronave = (modelo) =>
+    gravar(supabase.from('aeronaves').insert({ modelo }).select().single(), 'Aeronave adicionada.', (row) => ({
+      acao: 'incluiu', tabela: 'aeronaves', registro_id: row.id, resumo: modelo
+    }));
   const pedirRemoverAeronave = (a) =>
     setConfirmacao({
       titulo: 'Remover aeronave?',
       texto: `Remover ${a.modelo} da lista? Os voos já registados com este modelo não são alterados.`,
       botao: 'Sim, remover',
-      aoConfirmar: () => gravar(supabase.from('aeronaves').delete().eq('id', a.id), 'Aeronave removida.')
+      aoConfirmar: () =>
+        gravar(supabase.from('aeronaves').delete().eq('id', a.id), 'Aeronave removida.', {
+          acao: 'excluiu', tabela: 'aeronaves', registro_id: a.id, resumo: a.modelo
+        })
     });
 
   const trocarSenha = async (nova) => {
@@ -2264,7 +2220,21 @@ export default function App() {
       return false;
     }
     const senha_hash = await hashSenha(usuario.nome, nova);
-    return gravar(supabase.from('usuarios').update({ senha_hash }).eq('id', usuario.id), 'Senha atualizada.');
+    return gravar(supabase.from('usuarios').update({ senha_hash }).eq('id', usuario.id), 'Senha atualizada.', {
+      acao: 'alterou', tabela: 'usuarios', registro_id: usuario.id, resumo: `Senha de ${usuario.nome} alterada`
+    });
+  };
+  // Só o administrador redefine a senha de outro utilizador (a senha antiga nunca é exibida)
+  const resetarSenha = async (u, nova) => {
+    if (!ehAdmin) return false;
+    if (nova.length < 6) {
+      avisar('A senha deve ter no mínimo 6 caracteres.', 'erro');
+      return false;
+    }
+    const senha_hash = await hashSenha(u.nome, nova);
+    return gravar(supabase.from('usuarios').update({ senha_hash }).eq('id', u.id), `Senha de ${u.nome} redefinida.`, {
+      acao: 'alterou', tabela: 'usuarios', registro_id: u.id, resumo: `Senha de ${u.nome} redefinida pelo administrador`
+    });
   };
   const criarUsuario = async (nome, senha, perfil) => {
     if (senha.length < 6) {
@@ -2272,49 +2242,21 @@ export default function App() {
       return false;
     }
     const senha_hash = await hashSenha(nome, senha);
-    return gravar(
-      supabase.from('usuarios').insert({ nome: nome.trim().toUpperCase(), senha_hash, perfil }),
-      'Utilizador cadastrado.'
-    );
+    const nomeFinal = nome.trim().toUpperCase();
+    return gravar(supabase.from('usuarios').insert({ nome: nomeFinal, senha_hash, perfil }), 'Utilizador cadastrado.', {
+      acao: 'incluiu', tabela: 'usuarios', resumo: `${nomeFinal} (${perfil === 'admin' ? 'administrador' : 'operador'})`
+    });
   };
   const pedirRemoverUsuario = (u) =>
     setConfirmacao({
       titulo: 'Remover utilizador?',
       texto: `${u.nome} deixará de conseguir entrar no sistema.`,
       botao: 'Sim, remover',
-      aoConfirmar: () => gravar(supabase.from('usuarios').delete().eq('id', u.id), 'Utilizador removido.')
+      aoConfirmar: () =>
+        gravar(supabase.from('usuarios').delete().eq('id', u.id), 'Utilizador removido.', {
+          acao: 'excluiu', tabela: 'usuarios', registro_id: u.id, resumo: u.nome
+        })
     });
-
-  const solicitarAcesso = async (nome, senha) => {
-    const n = nome.trim().toUpperCase();
-    if (n.length < 3) return 'Informe seu nome (mínimo 3 caracteres).';
-    if (senha.length < 6) return 'A senha deve ter no mínimo 6 caracteres.';
-    const senha_hash = await hashSenha(n, senha);
-    const { error } = await supabase
-      .from('usuarios')
-      .insert({ nome: n, senha_hash, perfil: 'observador', aprovado: false });
-    if (error) {
-      return error.code === '23505'
-        ? 'Já existe um utilizador ou solicitação com esse nome.'
-        : 'Não foi possível enviar a solicitação. Tente novamente.';
-    }
-    return null;
-  };
-
-  const aprovarUsuario = (u, novoPerfil) =>
-    gravar(
-      supabase.from('usuarios').update({ aprovado: true, perfil: novoPerfil }).eq('id', u.id),
-      `${u.nome} aprovado como ${PERFIS[novoPerfil]}.`
-    );
-  const pedirRecusa = (u) =>
-    setConfirmacao({
-      titulo: 'Recusar solicitação?',
-      texto: `A solicitação de acesso de ${u.nome} será excluída.`,
-      botao: 'Sim, recusar',
-      aoConfirmar: () => gravar(supabase.from('usuarios').delete().eq('id', u.id), 'Solicitação recusada.')
-    });
-  const alterarPerfil = (u, novoPerfil) =>
-    gravar(supabase.from('usuarios').update({ perfil: novoPerfil }).eq('id', u.id), `Perfil de ${u.nome} alterado para ${PERFIS[novoPerfil]}.`);
 
   const ir = (id) => {
     if (id === 'adicionar') setVooEditando(null);
@@ -2328,9 +2270,9 @@ export default function App() {
 
   /* ---------- renderização ---------- */
   if (!supabaseConfigurado) return <TelaConfig />;
-  if (!usuario) return <TelaLogin onEntrar={entrar} onSolicitar={solicitarAcesso} online={online} />;
+  if (!usuario) return <TelaLogin onEntrar={entrar} onVerificar={verificarSenha} online={online} />;
 
-  const abaAtual = MENU.find((m) => m.id === aba && (!m.admin || ehAdmin) && (!m.edita || podeEditar)) ? aba : 'dashboard';
+  const abaAtual = MENU.find((m) => m.id === aba && (!m.admin || ehAdmin)) ? aba : 'dashboard';
 
   return (
     <>
@@ -2362,7 +2304,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-base font-extrabold uppercase leading-tight tracking-wide text-white">
-                FlightOps <span className="text-sky-400">BSB</span>
+                PCAN<span className="text-sky-400">-BR</span>
               </h1>
               <p className="hidden text-[10px] uppercase text-slate-400 sm:block">Posto CAN BR — Base Aérea de Brasília (SBBR)</p>
             </div>
@@ -2381,7 +2323,7 @@ export default function App() {
               className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-sky-300 hover:bg-slate-800"
               title="Sair"
             >
-              {usuario.nome} ({PERFIS[perfil] || perfil}) <LogOut size={14} className="text-rose-400" />
+              {usuario.nome} ({usuario.perfil === 'admin' ? 'Admin' : 'Operador'}) <LogOut size={14} className="text-rose-400" />
             </button>
           </div>
         </header>
@@ -2393,7 +2335,7 @@ export default function App() {
           {menuAberto && (
             <aside className="absolute left-0 top-0 z-30 flex h-full w-60 shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0a1120] p-3 lg:static">
               <nav className="space-y-1">
-                {MENU.filter((m) => (!m.admin || ehAdmin) && (!m.edita || podeEditar)).map(({ id, rotulo, Icone }) => (
+                {MENU.filter((m) => !m.admin || ehAdmin).map(({ id, rotulo, Icone }) => (
                   <button
                     key={id}
                     onClick={() => ir(id)}
@@ -2403,9 +2345,6 @@ export default function App() {
                   >
                     <Icone size={16} />
                     <span className="flex-1">{rotulo}</span>
-                    {id === 'usuarios' && pendentes.length > 0 && (
-                      <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-slate-900">{pendentes.length}</span>
-                    )}
                     {id === 'lixeira' && lixeira.length > 0 && (
                       <span className="rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white">{lixeira.length}</span>
                     )}
@@ -2428,7 +2367,7 @@ export default function App() {
             ) : (
               <>
                 {abaAtual === 'dashboard' && <TelaDashboard voos={ativos} desembarques={desembarques} aeronaves={aeronaves} />}
-                {abaAtual === 'voos' && <TelaPainel voos={ativos} aeronaves={aeronaves} onEditar={editar} onApagar={pedirExclusao} podeEditar={podeEditar} />}
+                {abaAtual === 'voos' && <TelaPainel voos={ativos} aeronaves={aeronaves} onEditar={editar} onApagar={pedirExclusao} />}
                 {abaAtual === 'adicionar' && (
                   <FormVoo
                     key={vooEditando?.id || 'novo'}
@@ -2449,22 +2388,19 @@ export default function App() {
                     onSalvar={salvarDesemb}
                     onApagar={pedirExclusaoDesemb}
                     avisar={avisar}
-                    podeEditar={podeEditar}
                   />
                 )}
                 {abaAtual === 'aeronaves' && <TelaAeronaves aeronaves={aeronaves} onAdicionar={adicionarAeronave} onRemover={pedirRemoverAeronave} />}
                 {abaAtual === 'relatorio' && <TelaRelatorio voos={ativos} desembarques={desembarques} aeronaves={aeronaves} />}
+                {abaAtual === 'historico' && <TelaHistorico historico={historico} />}
                 {abaAtual === 'usuarios' && (
                   <TelaUsuarios
                     usuario={usuario}
                     usuarios={usuarios}
-                    pendentes={pendentes}
                     onSenha={trocarSenha}
                     onCriar={criarUsuario}
                     onRemover={pedirRemoverUsuario}
-                    onAprovar={aprovarUsuario}
-                    onRecusar={pedirRecusa}
-                    onPerfil={alterarPerfil}
+                    onResetar={resetarSenha}
                   />
                 )}
                 {abaAtual === 'lixeira' && <TelaLixeira voos={lixeira} onRestaurar={restaurarVoo} onExcluirDef={pedirExclusaoDefinitiva} />}
@@ -2473,8 +2409,27 @@ export default function App() {
           </main>
         </div>
 
-        <footer className="shrink-0 border-t border-slate-800 bg-[#0a1120] py-2">
-          <Rodape />
+        {/* RODAPÉ: criador e última alteração */}
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-800 bg-[#0a1120] px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400">
+          <span>
+            {NOME_APP} · Criado por <b className="text-sky-300">{CRIADOR}</b>
+          </span>
+          <button
+            onClick={() => ir('historico')}
+            className="flex min-w-0 items-center gap-2 text-left hover:text-white"
+            title="Ver histórico de alterações"
+          >
+            <Clock size={12} className="shrink-0" />
+            {ultima ? (
+              <span className="max-w-[70vw] truncate">
+                Última alteração: <b className="text-white">{ultima.usuario}</b>{' '}
+                <span className="font-mono text-sky-300">({fmtTs(ultima.criado_em)})</span> — {ultima.acao}{' '}
+                {ROTULO_TABELA[ultima.tabela] || ultima.tabela}: {ultima.resumo}
+              </span>
+            ) : (
+              <span>Nenhuma alteração registada</span>
+            )}
+          </button>
         </footer>
 
         <Modal
@@ -2488,7 +2443,7 @@ export default function App() {
 
         {aviso && (
           <div
-            className={`fixed bottom-4 right-4 z-50 max-w-xs rounded-xl border px-4 py-3 text-xs font-bold shadow-xl ${
+            className={`fixed bottom-14 right-4 z-50 max-w-xs rounded-xl border px-4 py-3 text-xs font-bold shadow-xl ${
               aviso.tipo === 'erro' ? 'border-rose-800 bg-rose-950 text-rose-200' : 'border-emerald-800 bg-emerald-950 text-emerald-200'
             }`}
           >
@@ -2499,3 +2454,4 @@ export default function App() {
     </>
   );
 }
+

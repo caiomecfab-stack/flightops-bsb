@@ -9,6 +9,8 @@ import { supabase, supabaseConfigurado } from './supabase.js';
 
 /* Nome exibido no app e crédito de criação (altere aqui se quiser) */
 const NOME_APP = 'PCAN-BR';
+/* Aeroporto de origem que já vem preenchido na rota ao adicionar um voo novo */
+const ORIGEM_PADRAO = 'SBBR';
 const CRIADOR = 'CAIO';
 
 /* ================================================================
@@ -1589,11 +1591,30 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
   );
 }
 
+const MESES = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
+
 function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
   const filtro = useFiltro();
-  const lista = useMemo(() => filtrarVoos(voos, filtro.aplicado), [voos, filtro.aplicado]);
-  const pag = usePaginas(lista, JSON.stringify(filtro.aplicado));
-  const comAtencao = useMemo(() => lista.filter((v) => pendenciasSalvo(v).length > 0).length, [lista]);
+  const [todosMeses, setTodosMeses] = useState(false);
+  const [soPendencia, setSoPendencia] = useState(false);
+  const a = filtro.aplicado;
+  // Sem filtro de data aplicado, o painel mostra só os voos do mês vigente
+  const temFiltroData = !!(a.inicial || a.final || a.data || a.mes);
+  const mesVigente = hoje().slice(0, 7);
+  const soMesVigente = !temFiltroData && !todosMeses;
+  const nomeMes = `${MESES[Number(mesVigente.slice(5, 7)) - 1]}/${mesVigente.slice(0, 4)}`;
+  const base = useMemo(() => {
+    const l = filtrarVoos(voos, a);
+    return soMesVigente ? l.filter((v) => String(v.data_voo || '').startsWith(mesVigente)) : l;
+  }, [voos, a, soMesVigente, mesVigente]);
+  const comPend = useMemo(() => base.filter((v) => pendenciasSalvo(v).length > 0), [base]);
+  const comAtencao = comPend.length;
+  const lista = soPendencia ? comPend : base;
+  const pag = usePaginas(lista, `${JSON.stringify(a)}|${soMesVigente}|${soPendencia}`);
+  const chip = (ativo) =>
+    `flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase transition ${
+      ativo ? 'border-sky-500 bg-sky-900/60 text-sky-100' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+    }`;
   return (
     <div className="space-y-6">
       <div className={`${C.painel} space-y-4 p-5`}>
@@ -1606,18 +1627,43 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
         <BotoesFiltro filtro={filtro} />
       </div>
       <div className={`${C.painel} flex flex-wrap items-center justify-between gap-3 px-5 py-4`}>
-        <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
+        <div className="space-y-1">
+          <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
+          <p className="text-[11px] uppercase text-slate-400">
+            {soMesVigente
+              ? `Mostrando os voos do mês vigente: ${nomeMes}`
+              : temFiltroData
+                ? 'Mostrando os voos do período filtrado'
+                : 'Mostrando os voos de todos os meses'}
+            {soPendencia && ' — somente com pendência'}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
-          {comAtencao > 0 && (
-            <span className="alerta-piscar flex items-center gap-1.5 rounded-lg border border-amber-500 bg-amber-950/60 px-2.5 py-1 text-[11px] font-bold uppercase text-amber-300">
+          {comAtencao > 0 && !soPendencia && (
+            <button
+              type="button"
+              onClick={() => setSoPendencia(true)}
+              className="alerta-piscar flex items-center gap-1.5 rounded-lg border border-amber-500 bg-amber-950/60 px-2.5 py-1 text-[11px] font-bold uppercase text-amber-300"
+              title="Clique para ver só esses voos"
+            >
               <AlertTriangle size={13} /> {comAtencao} {comAtencao === 1 ? 'voo precisa' : 'voos precisam'} de atenção
-            </span>
+            </button>
+          )}
+          <button type="button" onClick={() => setSoPendencia((s) => !s)} className={chip(soPendencia)}>
+            <AlertTriangle size={13} /> Somente com pendência
+          </button>
+          {!temFiltroData && (
+            <button type="button" onClick={() => setTodosMeses((t) => !t)} className={chip(todosMeses)}>
+              <CalendarDays size={13} /> {todosMeses ? 'Voltar ao mês vigente' : 'Ver todos os meses'}
+            </button>
           )}
           <span className="font-mono text-[11px] uppercase text-slate-400">{lista.length} registos</span>
         </div>
       </div>
       {lista.length === 0 ? (
-        <p className="py-10 text-center text-xs uppercase text-slate-500">Nenhum voo encontrado.</p>
+        <p className="py-10 text-center text-xs uppercase text-slate-500">
+          {soPendencia ? 'Nenhum voo com pendência.' : soMesVigente ? `Nenhum voo registado em ${nomeMes}.` : 'Nenhum voo encontrado.'}
+        </p>
       ) : (
         <>
           <div className="space-y-3">
@@ -1649,7 +1695,7 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
           qtd_bagagens: String(voo.qtd_bagagens ?? '')
         }
       : {
-          aeronave: '', matricula: '', rota: '', data_voo: hoje(),
+          aeronave: '', matricula: '', rota: `${ORIGEM_PADRAO}-`, data_voo: hoje(),
           hora_chamada: '', hora_decolagem: '', hora_real: '',
           pax: '', peso_pax: '', peso_bagagem: '', qtd_bagagens: ''
         }
@@ -2037,12 +2083,31 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
   );
 }
 
-function TelaAeronaves({ aeronaves, onAdicionar, onRemover }) {
+function TelaAeronaves({ aeronaves, onAdicionar, onEditar, onRemover }) {
   const [modelo, setModelo] = useState('');
+  const [editando, setEditando] = useState(null);
+  const [propagar, setPropagar] = useState(true);
+  const cancelar = () => {
+    setEditando(null);
+    setModelo('');
+    setPropagar(true);
+  };
+  const iniciarEdicao = (a) => {
+    setEditando(a);
+    setModelo(a.modelo);
+    setPropagar(true);
+  };
   const enviar = async (e) => {
     e.preventDefault();
-    if (!modelo.trim()) return;
-    const ok = await onAdicionar(modelo.trim().toUpperCase());
+    const novo = modelo.trim().toUpperCase();
+    if (!novo) return;
+    if (editando) {
+      if (novo === editando.modelo) return cancelar();
+      const ok = await onEditar(editando, novo, propagar);
+      if (ok) cancelar();
+      return;
+    }
+    const ok = await onAdicionar(novo);
     if (ok) setModelo('');
   };
   return (
@@ -2051,19 +2116,38 @@ function TelaAeronaves({ aeronaves, onAdicionar, onRemover }) {
         <Plane size={15} /> Registar e gerir aeronaves FAB
       </div>
       <form onSubmit={enviar} className="space-y-4">
-        <Campo rotulo="Modelo da aeronave">
+        {editando && (
+          <div className="rounded-xl border border-amber-600/60 bg-amber-950/40 px-3 py-2 text-[11px] font-bold uppercase text-amber-300">
+            Editando: {editando.modelo}
+          </div>
+        )}
+        <Campo rotulo={editando ? 'Novo nome do modelo' : 'Modelo da aeronave'}>
           <input className={C.input} value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="EX: C-130 HÉRCULES" required />
         </Campo>
-        <button type="submit" className={`${C.botao} w-full`}>Adicionar aeronave</button>
+        {editando && (
+          <label className="flex cursor-pointer items-start gap-2 text-[11px] uppercase text-slate-300">
+            <input type="checkbox" className="sem-caixa mt-0.5" checked={propagar} onChange={(e) => setPropagar(e.target.checked)} />
+            Atualizar também os voos e desembarques já registados com o nome antigo
+          </label>
+        )}
+        <div className="flex gap-3">
+          <button type="submit" className={`${C.botao} flex-1`}>{editando ? 'Salvar alteração' : 'Adicionar aeronave'}</button>
+          {editando && (
+            <button type="button" onClick={cancelar} className={C.botaoSec}>Cancelar</button>
+          )}
+        </div>
       </form>
       <div className="space-y-2 border-t border-slate-800 pt-5">
         <h3 className="text-xs font-bold uppercase text-white">Aeronaves registradas:</h3>
         {aeronaves.map((a) => (
-          <div key={a.id} className={`${C.caixa} flex items-center justify-between px-3 py-3`}>
+          <div key={a.id} className={`${C.caixa} flex items-center justify-between px-3 py-3 ${editando?.id === a.id ? 'border-amber-500' : ''}`}>
             <span className="font-mono text-xs font-bold uppercase text-sky-300">{a.modelo}</span>
             <div className="flex items-center gap-3">
               <ShieldCheck size={15} className="text-emerald-400" />
-              <button onClick={() => onRemover(a)} className="text-rose-400 hover:text-rose-300" title="Remover">
+              <button type="button" onClick={() => iniciarEdicao(a)} className="text-sky-400 hover:text-sky-300" title="Editar">
+                <Pencil size={15} />
+              </button>
+              <button type="button" onClick={() => onRemover(a)} className="text-rose-400 hover:text-rose-300" title="Remover">
                 <Trash2 size={15} />
               </button>
             </div>
@@ -2782,6 +2866,26 @@ export default function App() {
     gravar(supabase.from('aeronaves').insert({ modelo }).select().single(), 'Aeronave adicionada.', (row) => ({
       acao: 'incluiu', tabela: 'aeronaves', registro_id: row.id, resumo: modelo
     }), aplicarAeronave);
+  const editarAeronave = async (a, novo, propagar) => {
+    const ok = await gravar(supabase.from('aeronaves').update({ modelo: novo }).eq('id', a.id).select().single(), 'Aeronave atualizada.', {
+      acao: 'alterou', tabela: 'aeronaves', registro_id: a.id, resumo: `${a.modelo} → ${novo}`
+    }, (row) => {
+      if (!row) return;
+      setAeronaves((l) => mesclar(semId(l, a.id), row, cmpNome));
+    });
+    if (!ok || !propagar) return ok;
+    const rv = await supabase.from('voos').update({ aeronave: novo }).eq('aeronave', a.modelo).select(VOO_COLS);
+    const rd = await supabase.from('desembarques').update({ aeronave: novo }).eq('aeronave', a.modelo).select();
+    if (rv.error || rd.error) {
+      avisar(`Aeronave renomeada, mas houve erro ao atualizar os registos: ${(rv.error || rd.error).message}`, 'erro');
+      return ok;
+    }
+    (rv.data || []).forEach(aplicarVoo);
+    (rd.data || []).forEach(aplicarDesemb);
+    const n = (rv.data || []).length + (rd.data || []).length;
+    if (n) avisar(`Aeronave atualizada em ${n} ${n === 1 ? 'registo' : 'registos'}.`);
+    return ok;
+  };
   const pedirRemoverAeronave = (a) =>
     setConfirmacao({
       titulo: 'Remover aeronave?',
@@ -2971,7 +3075,7 @@ export default function App() {
                     avisar={avisar}
                   />
                 )}
-                {abaAtual === 'aeronaves' && <TelaAeronaves aeronaves={aeronaves} onAdicionar={adicionarAeronave} onRemover={pedirRemoverAeronave} />}
+                {abaAtual === 'aeronaves' && <TelaAeronaves aeronaves={aeronaves} onAdicionar={adicionarAeronave} onEditar={editarAeronave} onRemover={pedirRemoverAeronave} />}
                 {abaAtual === 'relatorio' && <TelaRelatorio voos={ativos} desembarques={desembarques} aeronaves={aeronaves} />}
                 {abaAtual === 'historico' && <TelaHistorico historico={historico} />}
                 {abaAtual === 'usuarios' && (

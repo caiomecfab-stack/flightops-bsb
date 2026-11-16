@@ -149,7 +149,7 @@ const cruzar = (txtPrevisto, txtReal) => {
 /* ---------------------------------------------------------------
    FILTROS (valem para voos e para desembarques)
    --------------------------------------------------------------- */
-const FILTRO_VAZIO = { aeronaves: [], inicial: '', final: '', data: '', mes: '', locais: [] };
+const FILTRO_VAZIO = { aeronaves: [], inicial: '', final: '', data: '', mes: '', locais: [], pendencia: '' };
 const codigosRota = (rota) => (rota || '').toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
 
 const filtrarVoos = (lista, f) =>
@@ -160,6 +160,11 @@ const filtrarVoos = (lista, f) =>
     if (f.data && v.data_voo !== f.data) return false;
     if (f.mes && !v.data_voo.startsWith(f.mes)) return false;
     if (f.locais.length && !codigosRota(v.rota).some((c) => f.locais.includes(c))) return false;
+    if (f.pendencia) {
+      const tem = pendenciasSalvo(v).length > 0;
+      if (f.pendencia === 'com' && !tem) return false;
+      if (f.pendencia === 'sem' && tem) return false;
+    }
     return true;
   });
 
@@ -191,6 +196,11 @@ function useFiltro() {
     setAplicado((a) => ({ ...a, [chave]: vazioChave }));
     setRascunho((r) => ({ ...r, [chave]: vazioChave }));
   };
+  const aplicarCampo = (chave, valor) => {
+    if (!igual(aplicado[chave], valor)) guardar(aplicado);
+    setAplicado((a) => ({ ...a, [chave]: valor }));
+    setRascunho((r) => ({ ...r, [chave]: valor }));
+  };
   const desfazer = () => {
     if (!pilha.length) return;
     const anterior = pilha[pilha.length - 1];
@@ -198,7 +208,7 @@ function useFiltro() {
     setAplicado(anterior);
     setRascunho(anterior);
   };
-  return { rascunho, setRascunho, aplicado, gerar, limpar, remover, desfazer, podeDesfazer: pilha.length > 0, pendente, ativo };
+  return { rascunho, setRascunho, aplicado, gerar, limpar, remover, aplicarCampo, desfazer, podeDesfazer: pilha.length > 0, pendente, ativo };
 }
 
 /* ---------------------------------------------------------------
@@ -497,7 +507,7 @@ function MultiSelecao({ rotulo, opcoes, valor, onChange, todasRotulo = 'TODAS' }
   );
 }
 
-function CamposFiltro({ f, setF, aeronaves, comMes = true, rotulos = {} }) {
+function CamposFiltro({ f, setF, aeronaves, comMes = true, comPendencia = false, rotulos = {} }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return (
     <>
@@ -522,6 +532,15 @@ function CamposFiltro({ f, setF, aeronaves, comMes = true, rotulos = {} }) {
           <input type="month" className={C.input} value={f.mes} onChange={set('mes')} />
         </Campo>
       )}
+      {comPendencia && (
+        <Campo rotulo="Pendências">
+          <select className={C.input} value={f.pendencia || ''} onChange={set('pendencia')}>
+            <option value="">TODOS OS VOOS</option>
+            <option value="com">SOMENTE COM PENDÊNCIA</option>
+            <option value="sem">SOMENTE SEM PENDÊNCIA</option>
+          </select>
+        </Campo>
+      )}
     </>
   );
 }
@@ -535,6 +554,7 @@ function BotoesFiltro({ filtro }) {
   if (a.data) chips.push(['data', `Data ${fmtData(a.data)}`]);
   if (a.mes) chips.push(['mes', `Mês ${a.mes.split('-').reverse().join('/')}`]);
   if (a.locais.length) chips.push(['locais', `Locais: ${a.locais.join(', ')}`]);
+  if (a.pendencia) chips.push(['pendencia', a.pendencia === 'com' ? 'Somente com pendência' : 'Somente sem pendência']);
   return (
     <div className="space-y-3 border-t border-slate-800 pt-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -1596,21 +1616,20 @@ const MESES = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULH
 function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
   const filtro = useFiltro();
   const [todosMeses, setTodosMeses] = useState(false);
-  const [soPendencia, setSoPendencia] = useState(false);
   const a = filtro.aplicado;
+  const soPendencia = a.pendencia === 'com';
+  const setSoPendencia = (v) => filtro.aplicarCampo('pendencia', (typeof v === 'function' ? v(soPendencia) : v) ? 'com' : '');
   // Sem filtro de data aplicado, o painel mostra só os voos do mês vigente
   const temFiltroData = !!(a.inicial || a.final || a.data || a.mes);
   const mesVigente = hoje().slice(0, 7);
   const soMesVigente = !temFiltroData && !todosMeses;
   const nomeMes = `${MESES[Number(mesVigente.slice(5, 7)) - 1]}/${mesVigente.slice(0, 4)}`;
-  const base = useMemo(() => {
+  const lista = useMemo(() => {
     const l = filtrarVoos(voos, a);
     return soMesVigente ? l.filter((v) => String(v.data_voo || '').startsWith(mesVigente)) : l;
   }, [voos, a, soMesVigente, mesVigente]);
-  const comPend = useMemo(() => base.filter((v) => pendenciasSalvo(v).length > 0), [base]);
-  const comAtencao = comPend.length;
-  const lista = soPendencia ? comPend : base;
-  const pag = usePaginas(lista, `${JSON.stringify(a)}|${soMesVigente}|${soPendencia}`);
+  const comAtencao = useMemo(() => lista.filter((v) => pendenciasSalvo(v).length > 0).length, [lista]);
+  const pag = usePaginas(lista, `${JSON.stringify(a)}|${soMesVigente}`);
   const chip = (ativo) =>
     `flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase transition ${
       ativo ? 'border-sky-500 bg-sky-900/60 text-sky-100' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
@@ -1621,8 +1640,8 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
         <div className={C.titulo}>
           <Filter size={14} /> Filtros operacionais — Posto CAN BR
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} comPendencia />
         </div>
         <BotoesFiltro filtro={filtro} />
       </div>
@@ -1635,11 +1654,12 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
               : temFiltroData
                 ? 'Mostrando os voos do período filtrado'
                 : 'Mostrando os voos de todos os meses'}
-            {soPendencia && ' — somente com pendência'}
+            {a.pendencia === 'com' && ' — somente com pendência'}
+            {a.pendencia === 'sem' && ' — somente sem pendência'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {comAtencao > 0 && !soPendencia && (
+          {comAtencao > 0 && !a.pendencia && (
             <button
               type="button"
               onClick={() => setSoPendencia(true)}
@@ -1662,7 +1682,7 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
       </div>
       {lista.length === 0 ? (
         <p className="py-10 text-center text-xs uppercase text-slate-500">
-          {soPendencia ? 'Nenhum voo com pendência.' : soMesVigente ? `Nenhum voo registado em ${nomeMes}.` : 'Nenhum voo encontrado.'}
+          {soPendencia ? 'Nenhum voo com pendência.' : a.pendencia === 'sem' ? 'Nenhum voo sem pendência.' : soMesVigente ? `Nenhum voo registado em ${nomeMes}.` : 'Nenhum voo encontrado.'}
         </p>
       ) : (
         <>

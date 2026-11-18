@@ -441,18 +441,25 @@ function FundoAeronaves() {
         .alerta-piscar { animation: alerta-piscar 1.1s ease-in-out infinite; }
         @keyframes mapa-fluxo { to { stroke-dashoffset: -20; } }
         .mapa-linha { stroke-dasharray: 5 5; animation: mapa-fluxo 1.6s linear infinite; }
-        * { scrollbar-width: thin; scrollbar-color: rgba(148, 163, 184, 0.28) transparent; }
-        *::-webkit-scrollbar { width: 8px; height: 8px; }
+        *::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
         *::-webkit-scrollbar-track { background: transparent; }
         *::-webkit-scrollbar-thumb {
-          background: rgba(148, 163, 184, 0.25);
+          background: rgba(107, 114, 128, 0.40);
           border-radius: 999px;
           border: 2px solid transparent;
           background-clip: padding-box;
         }
-        *::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); background-clip: padding-box; }
-        *::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+        *::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.65); background-clip: padding-box; }
+        *::-webkit-scrollbar-button,
+        *::-webkit-scrollbar-button:single-button,
+        *::-webkit-scrollbar-button:vertical:decrement,
+        *::-webkit-scrollbar-button:vertical:increment,
+        *::-webkit-scrollbar-button:horizontal:decrement,
+        *::-webkit-scrollbar-button:horizontal:increment { display: none; width: 0; height: 0; background: transparent; }
         *::-webkit-scrollbar-corner { background: transparent; }
+        @supports not selector(::-webkit-scrollbar) {
+          * { scrollbar-width: thin; scrollbar-color: rgba(107, 114, 128, 0.5) transparent; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .fundo-aviao { animation: none; left: 35%; }
           .alerta-piscar, .mapa-linha { animation: none; }

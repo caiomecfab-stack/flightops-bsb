@@ -17,15 +17,15 @@ const CRIADOR = 'CAIO';
    ESTILOS REUTILIZÁVEIS
    ================================================================ */
 const C = {
-  painel: 'rounded-2xl border border-slate-800 bg-[#0c1424]/90',
-  caixa: 'rounded-xl border border-slate-800 bg-[#050a16]',
+  painel: 'rounded-2xl border border-slate-600 bg-[#29303a]/90',
+  caixa: 'rounded-xl border border-slate-600 bg-[#1e242c]',
   input:
-    'w-full rounded-xl border border-slate-800 bg-[#050a16] px-3 py-3 text-xs font-mono text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500 [color-scheme:dark]',
+    'w-full rounded-xl border border-slate-600 bg-[#1e242c] px-3 py-3 text-xs font-mono text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-sky-500 [color-scheme:dark]',
   label: 'block mb-1.5 text-[11px] uppercase tracking-wide text-slate-400',
   botao:
-    'rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wide px-4 py-3 transition',
+    'rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-slate-100 text-xs font-bold uppercase tracking-wide px-4 py-3 transition',
   botaoSec:
-    'rounded-xl border border-slate-700 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-300 hover:bg-slate-800 transition',
+    'rounded-xl border border-slate-500 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-300 hover:bg-slate-700 transition',
   titulo: 'flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-sky-400'
 };
 
@@ -170,12 +170,21 @@ const filtrarVoos = (lista, f) =>
 
 const somar = (lista, campo) => lista.reduce((s, v) => s + (Number(v[campo]) || 0), 0);
 
+// Os filtros ficam guardados fora das telas, para não se perderem ao trocar de aba
+// (por exemplo: filtrar voos com pendência, editar um voo, salvar e voltar ao painel).
+const FILTROS_SALVOS = {};
+const PAINEL_PREF = { todosMeses: false };
+
 // Os filtros só passam a valer quando o botão "Gerar filtros" é clicado.
 // "Desfazer filtro" volta ao filtro aplicado anteriormente; "Remover filtros" limpa tudo.
-function useFiltro() {
-  const [rascunho, setRascunho] = useState(FILTRO_VAZIO);
-  const [aplicado, setAplicado] = useState(FILTRO_VAZIO);
-  const [pilha, setPilha] = useState([]);
+function useFiltro(chave) {
+  const salvo = chave ? FILTROS_SALVOS[chave] : null;
+  const [rascunho, setRascunho] = useState(salvo ? salvo.rascunho : FILTRO_VAZIO);
+  const [aplicado, setAplicado] = useState(salvo ? salvo.aplicado : FILTRO_VAZIO);
+  const [pilha, setPilha] = useState(salvo ? salvo.pilha : []);
+  useEffect(() => {
+    if (chave) FILTROS_SALVOS[chave] = { rascunho, aplicado, pilha };
+  }, [chave, rascunho, aplicado, pilha]);
   const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const pendente = !igual(rascunho, aplicado);
   const ativo = !igual(aplicado, FILTRO_VAZIO);
@@ -311,7 +320,7 @@ const COR_ACAO = {
    arquivos na pasta public/avioes do projeto e preencha o campo
    "foto" de cada aeronave, por exemplo: foto: '/avioes/kc390.png'
    ================================================================ */
-const FUNDO = '#050a16';
+const FUNDO = '#1e242c';
 const traco = { stroke: FUNDO, strokeWidth: 1.6, strokeLinejoin: 'round' };
 
 const AVIOES = [
@@ -416,7 +425,7 @@ function FundoAeronaves() {
   const altura = [12, 62, 28, 72, 20, 48][i % 6];
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#050a16]" aria-hidden="true">
+    <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#1e242c]" aria-hidden="true">
       <style>{`
         @keyframes fundo-cruzar {
           from { transform: translateX(-520px); }
@@ -474,7 +483,7 @@ function MultiSelecao({ rotulo, opcoes, valor, onChange, todasRotulo = 'TODAS' }
   const todas = valor.length === 0;
   const resumo = todas ? `${todasRotulo} (${opcoes.length})` : valor.length === 1 ? valor[0] : `${valor.length} SELECIONADAS`;
   const alternar = (o) => onChange(valor.includes(o) ? valor.filter((x) => x !== o) : [...valor, o]);
-  const linha = 'flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-xs uppercase hover:bg-slate-800';
+  const linha = 'flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-xs uppercase hover:bg-slate-700';
   return (
     <Campo rotulo={rotulo} className="relative">
       <button type="button" onClick={() => setAberto((a) => !a)} className={`${C.input} flex items-center justify-between gap-2 text-left`}>
@@ -484,19 +493,19 @@ function MultiSelecao({ rotulo, opcoes, valor, onChange, todasRotulo = 'TODAS' }
       {aberto && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setAberto(false)} />
-          <div className="absolute left-0 right-0 z-40 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-700 bg-[#0a1120] p-2 shadow-xl">
+          <div className="absolute left-0 right-0 z-40 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-500 bg-[#252b34] p-2 shadow-xl">
             <label className={`${linha} font-bold text-sky-300`}>
               <input type="checkbox" checked={todas} onChange={() => onChange([])} /> {todasRotulo}
             </label>
-            <div className="my-1 border-t border-slate-800" />
+            <div className="my-1 border-t border-slate-600" />
             {opcoes.length === 0 && <p className="px-2 py-2 text-[11px] text-slate-500">Nenhuma opção disponível.</p>}
             {opcoes.map((o) => (
               <label key={o} className={`${linha} text-slate-200`}>
                 <input type="checkbox" checked={valor.includes(o)} onChange={() => alternar(o)} /> {o}
               </label>
             ))}
-            <div className="mt-1 border-t border-slate-800 pt-2 text-right">
-              <button type="button" onClick={() => setAberto(false)} className="rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold uppercase text-white hover:bg-sky-500">
+            <div className="mt-1 border-t border-slate-600 pt-2 text-right">
+              <button type="button" onClick={() => setAberto(false)} className="rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold uppercase text-slate-100 hover:bg-sky-500">
                 Ok
               </button>
             </div>
@@ -556,7 +565,7 @@ function BotoesFiltro({ filtro }) {
   if (a.locais.length) chips.push(['locais', `Locais: ${a.locais.join(', ')}`]);
   if (a.pendencia) chips.push(['pendencia', a.pendencia === 'com' ? 'Somente com pendência' : 'Somente sem pendência']);
   return (
-    <div className="space-y-3 border-t border-slate-800 pt-4">
+    <div className="space-y-3 border-t border-slate-600 pt-4">
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={filtro.gerar} className={`${C.botao} flex items-center gap-2`}>
           <Filter size={14} /> Gerar filtros
@@ -607,7 +616,7 @@ function BotoesFiltro({ filtro }) {
   );
 }
 
-const PALETA = ['#38bdf8', '#34d399', '#a78bfa', '#fbbf24', '#fb7185', '#22d3ee', '#f472b6', '#a3e635'];
+const PALETA = ['#4a7ba7', '#4f8a6b', '#b08a4e', '#7b8794', '#9a4f58', '#3e8a94', '#5d6bb0', '#8a9a4b'];
 
 // Gráfico principal: rosca. Gráfico secundário: barras.
 function CartaoMetrica({ titulo, total, unidade, tema, dados, destaque, onSelecionar }) {
@@ -645,7 +654,7 @@ function CartaoMetrica({ titulo, total, unidade, tema, dados, destaque, onSeleci
 
   return (
     <div className={`${C.painel} p-5`}>
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div className="flex items-center justify-between border-b border-slate-600 pb-3">
         <span className="text-[11px] font-bold uppercase tracking-wide text-slate-300">{titulo}</span>
         <span className={`font-mono text-xl font-extrabold ${tema.texto}`}>
           {total}
@@ -663,7 +672,7 @@ function CartaoMetrica({ titulo, total, unidade, tema, dados, destaque, onSeleci
           <>
             <div className="relative h-36 w-36 shrink-0">
               <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-                <circle cx="60" cy="60" r={R} fill="none" stroke="#1e293b" strokeWidth="16" />
+                <circle cx="60" cy="60" r={R} fill="none" stroke="#3a424e" strokeWidth="16" />
                 {fatias.map(({ d, i, len, off }) => (
                   <circle
                     key={d.nome}
@@ -682,7 +691,7 @@ function CartaoMetrica({ titulo, total, unidade, tema, dados, destaque, onSeleci
                 ))}
               </svg>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-mono text-base font-extrabold text-white">{itemFoco ? itemFoco.valor : total}</span>
+                <span className="font-mono text-base font-extrabold text-slate-100">{itemFoco ? itemFoco.valor : total}</span>
                 <span className="text-[9px] uppercase text-slate-500">{itemFoco ? `${pct(itemFoco.valor)}%` : 'total'}</span>
               </div>
             </div>
@@ -732,7 +741,7 @@ function CartaoMetrica({ titulo, total, unidade, tema, dados, destaque, onSeleci
       <div className="mt-3 flex min-h-[20px] items-center justify-between gap-2 text-[11px] uppercase">
         {itemFoco ? (
           <>
-            <span className="truncate font-bold text-white">{itemFoco.nome}</span>
+            <span className="truncate font-bold text-slate-100">{itemFoco.nome}</span>
             <span className={`shrink-0 font-mono font-bold ${tema.texto}`}>
               {itemFoco.valor}
               {sufixo} · {pct(itemFoco.valor)}%
@@ -750,7 +759,7 @@ function Caixa({ rotulo, valor, destaque }) {
   return (
     <div className={`${C.caixa} px-2 py-2.5 text-center`}>
       <div className="text-[11px] uppercase text-slate-400">{rotulo}</div>
-      <div className={`font-mono text-sm font-bold ${destaque ? 'text-sky-400' : 'text-white'}`}>{valor}</div>
+      <div className={`font-mono text-sm font-bold ${destaque ? 'text-sky-400' : 'text-slate-100'}`}>{valor}</div>
     </div>
   );
 }
@@ -759,15 +768,15 @@ function Celula({ rotulo, valor, sub, destaque }) {
   return (
     <div className="min-w-[64px]">
       <div className="text-[10px] uppercase tracking-wide text-slate-400">{rotulo}</div>
-      <div className={`font-mono text-sm font-bold ${destaque ? 'text-sky-400' : 'text-white'}`}>{valor}</div>
+      <div className={`font-mono text-sm font-bold ${destaque ? 'text-sky-400' : 'text-slate-100'}`}>{valor}</div>
       {sub && <div className="text-[10px] uppercase text-slate-500">{sub}</div>}
     </div>
   );
 }
 
-function Mini({ rotulo, valor, cor = 'text-white' }) {
+function Mini({ rotulo, valor, cor = 'text-slate-100' }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-[#050a16] px-1 py-1.5">
+    <div className="rounded-lg border border-slate-600 bg-[#1e242c] px-1 py-1.5">
       <div className={`font-mono text-sm font-bold ${cor}`}>{valor}</div>
       <div className="text-[9px] uppercase text-slate-500">{rotulo}</div>
     </div>
@@ -793,7 +802,7 @@ function RotaChips({ rota, paxDestinos }) {
         {codigos.map((c, i) => (
           <React.Fragment key={`${c}-${i}`}>
             {i > 0 && <span className="text-slate-500">→</span>}
-            <span className={`rounded-md px-2 py-1 font-mono text-xs font-bold ${i === 0 ? 'bg-slate-800 text-slate-200' : 'bg-sky-900/50 text-sky-200'}`}>
+            <span className={`rounded-md px-2 py-1 font-mono text-xs font-bold ${i === 0 ? 'bg-slate-700 text-slate-200' : 'bg-sky-900/50 text-sky-200'}`}>
               {c}
               {i > 0 && multi && paxDestinos && paxDestinos[c] !== undefined && (
                 <span className="ml-1 text-[10px] font-normal text-sky-400">({paxDestinos[c]} pax)</span>
@@ -810,7 +819,7 @@ function RotaChips({ rota, paxDestinos }) {
 // Cabeçalho e rodapé compartilhados pelas tiras de voo e de desembarque
 function TiraCabecalho({ Icone, aeronave, matricula, data, children }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-slate-800 px-5 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-slate-600 px-5 py-3">
       <div className="flex items-center gap-3">
         <div className="rounded-lg bg-sky-600/20 p-2 text-sky-300">
           <Icone size={18} />
@@ -818,13 +827,13 @@ function TiraCabecalho({ Icone, aeronave, matricula, data, children }) {
         <div>
           <h3 className="text-base font-bold uppercase leading-tight text-sky-400">{aeronave}</h3>
           <p className="text-[11px] uppercase text-slate-400">
-            Matrícula: <b className="font-mono text-white">{matricula || 'N/D'}</b>
+            Matrícula: <b className="font-mono text-slate-100">{matricula || 'N/D'}</b>
           </p>
         </div>
       </div>
       <div className="flex items-center gap-2 text-xs uppercase text-slate-300">
         <CalendarDays size={14} className="text-sky-400" />
-        <b className="font-mono text-white">{fmtData(data)}</b> · {diaSemana(data)}
+        <b className="font-mono text-slate-100">{fmtData(data)}</b> · {diaSemana(data)}
       </div>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
@@ -833,9 +842,9 @@ function TiraCabecalho({ Icone, aeronave, matricula, data, children }) {
 
 function TiraRodape({ por, em, onEditar, onApagar }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 bg-[#050a16]/50 px-5 py-2.5">
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-600 bg-[#1e242c]/50 px-5 py-2.5">
       <span className="text-[11px] uppercase text-slate-400">
-        Última alt. por: <b className="font-mono text-white">{por || '—'}</b> <span className="font-mono text-sky-300">({fmtTs(em)})</span>
+        Última alt. por: <b className="font-mono text-slate-100">{por || '—'}</b> <span className="font-mono text-sky-300">({fmtTs(em)})</span>
       </span>
       <div className="flex items-center gap-4 text-xs font-bold uppercase">
         <button onClick={onEditar} className="flex items-center gap-1 text-sky-400 hover:text-sky-300">
@@ -854,7 +863,7 @@ function TiraVoo({ v, onEditar, onApagar }) {
   const ef = calcEfetividade(v.hora_chamada, v.hora_decolagem, v.hora_real);
   const corEf =
     ef === null
-      ? 'border-slate-700 text-slate-400'
+      ? 'border-slate-500 text-slate-400'
       : ef >= 100
       ? 'border-emerald-700 bg-emerald-950/40 text-emerald-400'
       : 'border-amber-700 bg-amber-950/40 text-amber-400';
@@ -889,14 +898,14 @@ function TiraVoo({ v, onEditar, onApagar }) {
             <Celula rotulo="Hora real" valor={v.hora_real || '--:--'} />
           </div>
           <p className="mt-2 text-[11px] uppercase text-slate-400">
-            Previsto <b className="font-mono text-white">{fmtMin(previsto)}</b> · Real <b className="font-mono text-white">{fmtMin(executado)}</b>
+            Previsto <b className="font-mono text-slate-100">{fmtMin(previsto)}</b> · Real <b className="font-mono text-slate-100">{fmtMin(executado)}</b>
           </p>
         </Bloco>
 
         <Bloco titulo="Passageiros">
           <div className="flex items-end gap-4">
             <div>
-              <div className="font-mono text-2xl font-extrabold leading-none text-white">{v.pax}</div>
+              <div className="font-mono text-2xl font-extrabold leading-none text-slate-100">{v.pax}</div>
               <div className="mt-1 text-[10px] uppercase text-slate-400">PAX total</div>
             </div>
             <div className="grid flex-1 grid-cols-4 gap-1 text-center">
@@ -986,7 +995,7 @@ function BarraPaginas({ p }) {
     if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const btn =
-    'rounded-lg border border-slate-700 px-3 py-1.5 text-[11px] font-bold uppercase text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40';
+    'rounded-lg border border-slate-500 px-3 py-1.5 text-[11px] font-bold uppercase text-slate-300 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40';
   return (
     <div className={`${C.painel} flex flex-wrap items-center justify-between gap-3 px-5 py-3`}>
       <span className="font-mono text-[11px] uppercase text-slate-400">
@@ -994,7 +1003,7 @@ function BarraPaginas({ p }) {
       </span>
       <div className="flex flex-wrap items-center gap-2">
         <select
-          className="rounded-lg border border-slate-700 bg-[#050a16] px-2 py-1.5 text-[11px] uppercase text-slate-300"
+          className="rounded-lg border border-slate-500 bg-[#1e242c] px-2 py-1.5 text-[11px] uppercase text-slate-300"
           value={p.tamanho}
           onChange={(e) => p.setTamanho(Number(e.target.value))}
         >
@@ -1004,7 +1013,7 @@ function BarraPaginas({ p }) {
         </select>
         <button className={btn} disabled={p.pagina <= 1} onClick={() => ir(1)}>« Primeira</button>
         <button className={btn} disabled={p.pagina <= 1} onClick={() => ir(p.pagina - 1)}>‹ Anterior</button>
-        <span className="font-mono text-[11px] text-white">{p.pagina} / {p.total}</span>
+        <span className="font-mono text-[11px] text-slate-100">{p.pagina} / {p.total}</span>
         <button className={btn} disabled={p.pagina >= p.total} onClick={() => ir(p.pagina + 1)}>Próxima ›</button>
         <button className={btn} disabled={p.pagina >= p.total} onClick={() => ir(p.total)}>Última »</button>
       </div>
@@ -1042,14 +1051,14 @@ function Modal({ dados, onCancelar, onConfirmar }) {
         <div className="flex gap-3 pt-2">
           <button
             onClick={onCancelar}
-            className="flex-1 rounded-xl border border-slate-700 py-3 text-xs font-bold uppercase text-slate-300 hover:bg-slate-800"
+            className="flex-1 rounded-xl border border-slate-500 py-3 text-xs font-bold uppercase text-slate-300 hover:bg-slate-700"
           >
             {dados.botaoCancelar || 'Cancelar'}
           </button>
           <button
             onClick={confirmar}
             disabled={ocupado}
-            className={`flex-1 rounded-xl py-3 text-xs font-bold uppercase text-white disabled:opacity-50 ${
+            className={`flex-1 rounded-xl py-3 text-xs font-bold uppercase text-slate-100 disabled:opacity-50 ${
               aviso ? 'bg-amber-600 hover:bg-amber-500' : 'bg-rose-600 hover:bg-rose-500'
             }`}
           >
@@ -1066,7 +1075,7 @@ function Modal({ dados, onCancelar, onConfirmar }) {
    ================================================================ */
 function TelaConfig() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#050a16] p-6 text-slate-200">
+    <div className="flex min-h-screen items-center justify-center bg-[#1e242c] p-6 text-slate-200">
       <div className={`${C.painel} max-w-lg space-y-3 p-8`}>
         <h1 className="text-sm font-bold uppercase text-amber-400">Banco de dados não configurado</h1>
         <p className="text-xs leading-relaxed text-slate-300">
@@ -1131,7 +1140,7 @@ function TelaLogin({ onEntrar, onVerificar, online }) {
       <div className="relative z-10 flex min-h-screen items-center justify-center p-4 text-slate-200">
         <form onSubmit={enviar} className={`${C.painel} w-full max-w-sm space-y-5 p-8`}>
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-sky-600 p-2.5 text-white">
+            <div className="rounded-xl bg-sky-600 p-2.5 text-slate-100">
               <Plane size={22} />
             </div>
             <div>
@@ -1293,10 +1302,10 @@ function MapaBrasil({ voos }) {
               const fill = ativo
                 ? dado
                   ? 'rgba(56,189,248,0.85)'
-                  : '#24405f'
+                  : '#3a4a5e'
                 : dado
                 ? `rgba(56,189,248,${inten.toFixed(2)})`
-                : '#0f1b30';
+                : '#2a323d';
               return (
                 <g
                   key={e.uf}
@@ -1308,7 +1317,7 @@ function MapaBrasil({ voos }) {
                   <path
                     d={e.d}
                     fill={fill}
-                    stroke={ativo ? '#bae6fd' : '#334155'}
+                    stroke={ativo ? '#bae6fd' : '#4b5563'}
                     strokeWidth={ativo ? 1.6 : 0.8}
                     strokeLinejoin="round"
                     style={{
@@ -1364,7 +1373,7 @@ function MapaBrasil({ voos }) {
                   y={d.y - 3.5}
                   fontSize="7"
                   fill="#e2e8f0"
-                  stroke="#050a16"
+                  stroke="#1e242c"
                   strokeWidth="2"
                   paintOrder="stroke"
                 >
@@ -1376,7 +1385,7 @@ function MapaBrasil({ voos }) {
                 <animate attributeName="r" values="4;12;4" dur="2.2s" repeatCount="indefinite" />
                 <animate attributeName="opacity" values="0.8;0;0.8" dur="2.2s" repeatCount="indefinite" />
               </circle>
-              <text x={BRASILIA.x + 7} y={BRASILIA.y + 12} fontSize="8" fontWeight="700" fill="#fde68a" stroke="#050a16" strokeWidth="2" paintOrder="stroke">
+              <text x={BRASILIA.x + 7} y={BRASILIA.y + 12} fontSize="8" fontWeight="700" fill="#fde68a" stroke="#1e242c" strokeWidth="2" paintOrder="stroke">
                 BRASÍLIA
               </text>
             </g>
@@ -1389,7 +1398,7 @@ function MapaBrasil({ voos }) {
               <>
                 <div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-sky-500/80">Estado em destaque</div>
-                  <div className="text-base font-extrabold uppercase text-white">
+                  <div className="text-base font-extrabold uppercase text-slate-100">
                     {eh.uf} — {eh.nome}
                   </div>
                 </div>
@@ -1424,7 +1433,7 @@ function MapaBrasil({ voos }) {
             {lista.length === 0 ? (
               <p className="text-xs uppercase text-slate-500">Nenhum destino encontrado para os filtros atuais.</p>
             ) : (
-              <div className={`${C.caixa} divide-y divide-slate-800`}>
+              <div className={`${C.caixa} divide-y divide-slate-600`}>
                 {lista.slice(0, 10).map((d) => (
                   <div
                     key={d.codigo}
@@ -1458,7 +1467,7 @@ function MapaBrasil({ voos }) {
 }
 
 function TelaDashboard({ voos, desembarques, aeronaves }) {
-  const filtro = useFiltro();
+  const filtro = useFiltro('dashboard');
   const f = filtro.aplicado;
   const [mostrarEstat, setMostrarEstat] = useState(false);
   const [destaque, setDestaque] = useState('');
@@ -1514,7 +1523,7 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <CamposFiltro f={filtro.rascunho} setF={filtro.setRascunho} aeronaves={aeronaves} />
         </div>
-        <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 border-t border-slate-600 pt-4 lg:grid-cols-2">
           <MultiSelecao
             rotulo="Filtrar pax por localidade / destino"
             opcoes={localidades}
@@ -1528,9 +1537,9 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
 
       <div className={`${C.painel} flex flex-wrap items-center justify-between gap-4 p-5`}>
         <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-sky-600 p-2.5 text-white"><PieChart size={18} /></div>
+          <div className="rounded-xl bg-sky-600 p-2.5 text-slate-100"><PieChart size={18} /></div>
           <div>
-            <h3 className="text-xs font-extrabold uppercase text-white">Perfil estatística operacional</h3>
+            <h3 className="text-xs font-extrabold uppercase text-slate-100">Perfil estatística operacional</h3>
             <p className="text-[11px] text-slate-400">Gere a visão consolidada por tipo de aeronave aplicando os filtros acima.</p>
           </div>
         </div>
@@ -1543,7 +1552,7 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
         <div className={`${C.painel} overflow-x-auto p-5`}>
           <table className="w-full min-w-[640px] text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800 text-[10px] uppercase text-slate-400">
+              <tr className="border-b border-slate-600 text-[10px] uppercase text-slate-400">
                 {['Aeronave', 'Voos', 'Pax', 'Desemb.', 'Peso pax', 'Bagagem', 'Total', 'Efetividade média'].map((h) => (
                   <th key={h} className="px-2 py-2">{h}</th>
                 ))}
@@ -1554,7 +1563,7 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
                 <tr><td colSpan="8" className="px-2 py-4 text-center text-slate-500">Sem voos para os filtros atuais.</td></tr>
               )}
               {grupos.map((g) => (
-                <tr key={g.aeronave} className="border-b border-slate-800/60">
+                <tr key={g.aeronave} className="border-b border-slate-600/60">
                   <td className="px-2 py-2 font-bold text-sky-400">{g.aeronave}</td>
                   <td className="px-2 py-2">{g.voos}</td>
                   <td className="px-2 py-2">{g.pax}</td>
@@ -1614,8 +1623,14 @@ function TelaDashboard({ voos, desembarques, aeronaves }) {
 const MESES = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 
 function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
-  const filtro = useFiltro();
-  const [todosMeses, setTodosMeses] = useState(false);
+  const filtro = useFiltro('painel');
+  const [todosMeses, setTodosMesesEstado] = useState(PAINEL_PREF.todosMeses);
+  const setTodosMeses = (v) =>
+    setTodosMesesEstado((t) => {
+      const n = typeof v === 'function' ? v(t) : v;
+      PAINEL_PREF.todosMeses = n;
+      return n;
+    });
   const a = filtro.aplicado;
   const soPendencia = a.pendencia === 'com';
   const setSoPendencia = (v) => filtro.aplicarCampo('pendencia', (typeof v === 'function' ? v(soPendencia) : v) ? 'com' : '');
@@ -1632,7 +1647,7 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
   const pag = usePaginas(lista, `${JSON.stringify(a)}|${soMesVigente}`);
   const chip = (ativo) =>
     `flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase transition ${
-      ativo ? 'border-sky-500 bg-sky-900/60 text-sky-100' : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+      ativo ? 'border-sky-500 bg-sky-900/60 text-sky-100' : 'border-slate-500 text-slate-300 hover:bg-slate-700'
     }`;
   return (
     <div className="space-y-6">
@@ -1647,7 +1662,7 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
       </div>
       <div className={`${C.painel} flex flex-wrap items-center justify-between gap-3 px-5 py-4`}>
         <div className="space-y-1">
-          <h3 className="text-xs font-bold uppercase text-white">Painel de registo de voos — Posto CAN BR</h3>
+          <h3 className="text-xs font-bold uppercase text-slate-100">Painel de registo de voos — Posto CAN BR</h3>
           <p className="text-[11px] uppercase text-slate-400">
             {soMesVigente
               ? `Mostrando os voos do mês vigente: ${nomeMes}`
@@ -1671,6 +1686,15 @@ function TelaPainel({ voos, aeronaves, onEditar, onApagar }) {
           )}
           <button type="button" onClick={() => setSoPendencia((s) => !s)} className={chip(soPendencia)}>
             <AlertTriangle size={13} /> Somente com pendência
+          </button>
+          <button
+            type="button"
+            onClick={filtro.desfazer}
+            disabled={!filtro.podeDesfazer}
+            className={`${chip(false)} disabled:cursor-not-allowed disabled:opacity-40`}
+            title="Volta ao filtro aplicado anteriormente"
+          >
+            <RotateCcw size={13} /> Desfazer filtro
           </button>
           {!temFiltroData && (
             <button type="button" onClick={() => setTodosMeses((t) => !t)} className={chip(todosMeses)}>
@@ -1906,7 +1930,7 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 border-t border-slate-800 pt-5 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 border-t border-slate-600 pt-5 md:grid-cols-2">
           <div>
             <div className="mb-1 flex items-center gap-2 text-[11px] font-bold uppercase text-sky-400">
               <FileText size={13} /> 1. Copiar & colar relação principal
@@ -1927,7 +1951,7 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
 
         <div className={`${C.caixa} grid grid-cols-2 gap-4 p-4 text-center sm:grid-cols-5`}>
           {[
-            ['Total previsto', cruz.total_previsto, 'text-white'],
+            ['Total previsto', cruz.total_previsto, 'text-slate-100'],
             ['Embarcados', cruz.embarcados, 'text-sky-400'],
             ['Faltas', cruz.faltas, 'text-amber-400'],
             ['Extras (+)', cruz.extras, 'text-emerald-400'],
@@ -1963,7 +1987,7 @@ function FormVoo({ aeronaves, voo, onSalvar, onCancelar, avisar }) {
 const NOVO_DESEMB = () => ({ aeronave: '', matricula: '', rota: '', data_voo: hoje(), desembarcados: '' });
 
 function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }) {
-  const filtro = useFiltro();
+  const filtro = useFiltro('desembarque');
   const [f, setF] = useState(NOVO_DESEMB);
   const [editando, setEditando] = useState(null);
   const [salvando, setSalvando] = useState(false);
@@ -2078,11 +2102,11 @@ function TelaDesembarque({ desembarques, aeronaves, onSalvar, onApagar, avisar }
       </div>
 
       <div className={`${C.painel} flex flex-wrap items-center justify-between gap-3 px-5 py-4`}>
-        <h3 className="text-xs font-bold uppercase text-white">Voos de desembarque registados</h3>
+        <h3 className="text-xs font-bold uppercase text-slate-100">Voos de desembarque registados</h3>
         <div className="flex items-center gap-4 font-mono text-[11px] uppercase text-slate-400">
           <span>{lista.length} voos</span>
           <span className="text-sky-300">
-            Total desembarcados: <b className="text-white">{total}</b>
+            Total desembarcados: <b className="text-slate-100">{total}</b>
           </span>
         </div>
       </div>
@@ -2157,8 +2181,8 @@ function TelaAeronaves({ aeronaves, onAdicionar, onEditar, onRemover }) {
           )}
         </div>
       </form>
-      <div className="space-y-2 border-t border-slate-800 pt-5">
-        <h3 className="text-xs font-bold uppercase text-white">Aeronaves registradas:</h3>
+      <div className="space-y-2 border-t border-slate-600 pt-5">
+        <h3 className="text-xs font-bold uppercase text-slate-100">Aeronaves registradas:</h3>
         {aeronaves.map((a) => (
           <div key={a.id} className={`${C.caixa} flex items-center justify-between px-3 py-3 ${editando?.id === a.id ? 'border-amber-500' : ''}`}>
             <span className="font-mono text-xs font-bold uppercase text-sky-300">{a.modelo}</span>
@@ -2179,7 +2203,7 @@ function TelaAeronaves({ aeronaves, onAdicionar, onEditar, onRemover }) {
 }
 
 function TelaRelatorio({ voos, desembarques, aeronaves }) {
-  const filtro = useFiltro();
+  const filtro = useFiltro('relatorio');
   const lista = useMemo(() => filtrarVoos(voos, filtro.aplicado), [voos, filtro.aplicado]);
   const listaDesemb = useMemo(() => filtrarVoos(desembarques, filtro.aplicado), [desembarques, filtro.aplicado]);
 
@@ -2200,7 +2224,7 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-xs">
           <thead>
-            <tr className="bg-[#0c1424] text-[10px] uppercase text-white">
+            <tr className="bg-[#29303a] text-[10px] uppercase text-slate-100">
               {['Data / Dia', 'Aeronave / Matr.', 'Rota', 'Pax', 'Peso total', 'Efetividade'].map((h) => (
                 <th key={h} className="px-3 py-3">{h}</th>
               ))}
@@ -2241,7 +2265,7 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
           <h3 className="mb-2 text-xs font-extrabold uppercase">Desembarques registados</h3>
           <table className="w-full min-w-[480px] text-left text-xs">
             <thead>
-              <tr className="bg-[#0c1424] text-[10px] uppercase text-white">
+              <tr className="bg-[#29303a] text-[10px] uppercase text-slate-100">
                 {['Data / Dia', 'Aeronave / Matr.', 'Rota', 'Desembarcados'].map((h) => (
                   <th key={h} className="px-3 py-3">{h}</th>
                 ))}
@@ -2283,7 +2307,7 @@ function TelaRelatorio({ voos, desembarques, aeronaves }) {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className={`${C.painel} space-y-4 p-5`}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-600 pb-4">
           <div className={C.titulo}>
             <Printer size={15} /> Gerador e impressão de relatório — Posto CAN BR
           </div>
@@ -2371,13 +2395,13 @@ function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover, onReseta
             <option value="admin">ADMINISTRADOR</option>
           </select>
         </Campo>
-        <button type="submit" className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-bold uppercase text-white hover:bg-emerald-500">
+        <button type="submit" className="w-full rounded-xl bg-emerald-600 py-3 text-xs font-bold uppercase text-slate-100 hover:bg-emerald-500">
           Cadastrar utilizador
         </button>
       </form>
 
       <div className={`${C.painel} space-y-3 p-6`}>
-        <h3 className="text-xs font-bold uppercase text-white">Utilizadores com acesso ao sistema ({usuarios.length})</h3>
+        <h3 className="text-xs font-bold uppercase text-slate-100">Utilizadores com acesso ao sistema ({usuarios.length})</h3>
         {usuarios.map((u) => (
           <div key={u.id} className={`${C.caixa} px-3 py-3`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2385,7 +2409,7 @@ function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover, onReseta
                 <div className="font-mono text-xs font-bold uppercase text-sky-300">{u.nome}</div>
                 <div className="mt-0.5 text-[11px] uppercase text-slate-400">
                   Último acesso:{' '}
-                  <span className="font-mono text-white">{u.ultimo_acesso ? fmtTs(u.ultimo_acesso) : 'nunca acessou'}</span>
+                  <span className="font-mono text-slate-100">{u.ultimo_acesso ? fmtTs(u.ultimo_acesso) : 'nunca acessou'}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -2407,7 +2431,7 @@ function TelaUsuarios({ usuario, usuarios, onSenha, onCriar, onRemover, onReseta
               </div>
             </div>
             {resetId === u.id && (
-              <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+              <div className="mt-3 space-y-2 border-t border-slate-600 pt-3">
                 <div className="text-[11px] uppercase text-slate-400">Nova senha para {u.nome} (mínimo 6 caracteres)</div>
                 <div className="flex flex-wrap gap-2">
                   <input
@@ -2450,11 +2474,11 @@ function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
                 <div>
                   <h3 className="text-sm font-bold uppercase text-sky-400">{v.aeronave}</h3>
                   <p className="mt-1 text-[11px] uppercase text-slate-400">
-                    Matrícula: <b className="font-mono text-white">{v.matricula || 'N/D'}</b>
+                    Matrícula: <b className="font-mono text-slate-100">{v.matricula || 'N/D'}</b>
                   </p>
                 </div>
                 <div className="text-right">
-                  <span className="rounded-md bg-slate-800/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">{v.rota || '—'}</span>
+                  <span className="rounded-md bg-slate-700/80 px-2 py-1 font-mono text-[11px] font-bold text-sky-300">{v.rota || '—'}</span>
                   <p className="mt-1 font-mono text-[10px] text-slate-500">{v.data_voo}</p>
                 </div>
               </div>
@@ -2464,10 +2488,10 @@ function TelaLixeira({ voos, onRestaurar, onExcluirDef }) {
                 <Caixa rotulo="Total" valor={`${v.total_peso} KG`} destaque />
               </div>
               <div className="rounded-lg border border-rose-900/60 bg-rose-950/20 px-3 py-2 text-[11px] uppercase text-rose-300">
-                Excluído por <b className="font-mono text-white">{v.excluido_por || '—'}</b>{' '}
+                Excluído por <b className="font-mono text-slate-100">{v.excluido_por || '—'}</b>{' '}
                 <span className="font-mono">({fmtTs(v.excluido_em)})</span>
               </div>
-              <div className="flex items-center justify-end gap-5 border-t border-slate-800 pt-3 text-[11px] font-bold uppercase">
+              <div className="flex items-center justify-end gap-5 border-t border-slate-600 pt-3 text-[11px] font-bold uppercase">
                 <button onClick={() => onRestaurar(v)} className="flex items-center gap-1 text-emerald-400 hover:text-emerald-300">
                   <RotateCcw size={13} /> Restaurar
                 </button>
@@ -2531,18 +2555,18 @@ function TelaHistorico({ historico }) {
               <div key={h.id} className={`${C.painel} space-y-2 px-5 py-4`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${COR_ACAO[h.acao] || 'border-slate-600 text-slate-300'}`}>
+                    <span className={`rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase ${COR_ACAO[h.acao] || 'border-slate-500 text-slate-300'}`}>
                       {h.acao}
                     </span>
                     <span className="text-xs font-bold uppercase text-sky-300">{ROTULO_TABELA[h.tabela] || h.tabela}</span>
-                    <span className="text-xs uppercase text-white">{h.resumo}</span>
+                    <span className="text-xs uppercase text-slate-100">{h.resumo}</span>
                   </div>
                   <span className="font-mono text-[11px] text-slate-400">
-                    {fmtTs(h.criado_em)} · <b className="text-white">{h.usuario}</b>
+                    {fmtTs(h.criado_em)} · <b className="text-slate-100">{h.usuario}</b>
                   </span>
                 </div>
                 {alts.length > 0 && (
-                  <ul className="space-y-1 border-t border-slate-800 pt-2 text-xs">
+                  <ul className="space-y-1 border-t border-slate-600 pt-2 text-xs">
                     {alts.map((d) => (
                       <li key={d.campo} className="flex flex-wrap items-center gap-x-2 text-slate-300">
                         <b className="uppercase text-slate-400">{d.campo}:</b>
@@ -2737,6 +2761,8 @@ export default function App() {
   }, [usuario]);
 
   const sair = useCallback(() => {
+    Object.keys(FILTROS_SALVOS).forEach((k) => delete FILTROS_SALVOS[k]);
+    PAINEL_PREF.todosMeses = false;
     setUsuario(null);
     gravarLocal('flightops_sessao', null);
     setAba('dashboard');
@@ -2995,20 +3021,20 @@ export default function App() {
         `}</style>
 
         {/* CABEÇALHO */}
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800 bg-[#0a1120] px-4 py-3">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-600 bg-[#252b34] px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMenuAberto((m) => !m)}
-              className="rounded-xl border border-slate-700 p-2 text-slate-200 hover:bg-slate-800"
+              className="rounded-xl border border-slate-500 p-2 text-slate-200 hover:bg-slate-700"
               aria-label="Menu"
             >
               <Menu size={18} />
             </button>
-            <div className="rounded-xl bg-sky-600 p-2 text-white shadow-lg shadow-sky-600/30">
+            <div className="rounded-xl bg-sky-600 p-2 text-slate-100 shadow-lg shadow-sky-600/30">
               <Plane size={20} />
             </div>
             <div>
-              <h1 className="text-base font-extrabold uppercase leading-tight tracking-wide text-white">
+              <h1 className="text-base font-extrabold uppercase leading-tight tracking-wide text-slate-100">
                 PCAN<span className="text-sky-400">-BR</span>
               </h1>
               <p className="hidden text-[10px] uppercase text-slate-400 sm:block">Posto CAN BR — Base Aérea de Brasília (SBBR)</p>
@@ -3025,7 +3051,7 @@ export default function App() {
             </span>
             <button
               onClick={sair}
-              className="flex items-center gap-2 rounded-full border border-slate-700 px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-sky-300 hover:bg-slate-800"
+              className="flex items-center gap-2 rounded-full border border-slate-500 px-3 py-1.5 font-mono text-[11px] font-bold uppercase text-sky-300 hover:bg-slate-700"
               title="Sair"
             >
               {usuario.nome} ({usuario.perfil === 'admin' ? 'Admin' : 'Operador'}) <LogOut size={14} className="text-rose-400" />
@@ -3038,27 +3064,27 @@ export default function App() {
 
           {/* MENU LATERAL */}
           {menuAberto && (
-            <aside className="absolute left-0 top-0 z-30 flex h-full w-60 shrink-0 flex-col justify-between border-r border-slate-800 bg-[#0a1120] p-3 lg:static">
+            <aside className="absolute left-0 top-0 z-30 flex h-full w-60 shrink-0 flex-col justify-between border-r border-slate-600 bg-[#252b34] p-3 lg:static">
               <nav className="space-y-1">
                 {MENU.filter((m) => !m.admin || ehAdmin).map(({ id, rotulo, Icone }) => (
                   <button
                     key={id}
                     onClick={() => ir(id)}
                     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-xs font-semibold transition ${
-                      abaAtual === id ? 'bg-sky-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      abaAtual === id ? 'bg-sky-600 text-slate-100' : 'text-slate-400 hover:bg-slate-700 hover:text-slate-100'
                     }`}
                   >
                     <Icone size={16} />
                     <span className="flex-1">{rotulo}</span>
                     {id === 'lixeira' && lixeira.length > 0 && (
-                      <span className="rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white">{lixeira.length}</span>
+                      <span className="rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-slate-100">{lixeira.length}</span>
                     )}
                   </button>
                 ))}
               </nav>
               <button
                 onClick={() => setMenuAberto(false)}
-                className="flex items-center justify-center gap-2 rounded-lg bg-slate-800/70 py-2.5 text-xs text-slate-300 hover:bg-slate-800"
+                className="flex items-center justify-center gap-2 rounded-lg bg-slate-700/70 py-2.5 text-xs text-slate-300 hover:bg-slate-700"
               >
                 <ChevronLeft size={14} /> Ocultar Menu
               </button>
@@ -3115,19 +3141,19 @@ export default function App() {
         </div>
 
         {/* RODAPÉ: criador e última alteração */}
-        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-800 bg-[#0a1120] px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400">
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-600 bg-[#252b34] px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400">
           <span>
             {NOME_APP} · Criado por <b className="text-sky-300">{CRIADOR}</b>
           </span>
           <button
             onClick={() => ir('historico')}
-            className="flex min-w-0 items-center gap-2 text-left hover:text-white"
+            className="flex min-w-0 items-center gap-2 text-left hover:text-slate-100"
             title="Ver histórico de alterações"
           >
             <Clock size={12} className="shrink-0" />
             {ultima ? (
               <span className="max-w-[70vw] truncate">
-                Última alteração: <b className="text-white">{ultima.usuario}</b>{' '}
+                Última alteração: <b className="text-slate-100">{ultima.usuario}</b>{' '}
                 <span className="font-mono text-sky-300">({fmtTs(ultima.criado_em)})</span> — {ultima.acao}{' '}
                 {ROTULO_TABELA[ultima.tabela] || ultima.tabela}: {ultima.resumo}
               </span>
